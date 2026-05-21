@@ -356,7 +356,7 @@
                     </div>
                     <div class="form-group" style="flex:2">
                         <label>Tên khách hàng</label>
-                        <input type="text" id="ord-customer" list="customer-list" required placeholder="Gõ / Chọn khách hàng">
+                        <input type="text" id="ord-customer" list="customer-list" required placeholder="Gõ / Chọn khách hàng" onchange="handleCustomerSelect()">
                     </div>
                     <div class="form-group" style="flex:1">
                         <label>Ngày giao</label>
@@ -405,9 +405,8 @@
                 </div>
 
                 <div class="form-group" style="margin-top: 15px;">
-                    <label>
-                        <input type="checkbox" id="ord-debt-check"> Khách ghi nợ (chưa thanh toán đủ)
-                    </label>
+                    <label>Khách đã thanh toán (₫)</label>
+                    <input type="number" id="ord-paid" min="0" value="0" placeholder="Để trống nếu chưa trả đồng nào">
                 </div>
 
                 <button type="submit" class="btn-primary w-full" style="margin-top: 15px;">Lưu đơn bán hàng</button>

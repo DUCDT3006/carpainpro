@@ -134,7 +134,7 @@ window.openEditModal = function(collection, docId) {
         document.getElementById('ord-phone').value = item.phone || '';
         document.getElementById('ord-address').value = item.address || '';
         document.getElementById('ord-shipping').value = item.shipping || 0;
-        document.getElementById('ord-debt-check').checked = item.status === 'Chưa thanh toán';
+        document.getElementById('ord-paid').value = item.paid ?? (item.status === 'Chưa thanh toán' ? 0 : item.total);
         
         currentOrderItems = JSON.parse(JSON.stringify(item.items || []));
         renderOrderItems();
@@ -707,6 +707,31 @@ window.fillOrderPrice = function() {
     if(product) priceInput.value = product.outPrice;
 }
 
+window.handleCustomerSelect = function() {
+    const customer = document.getElementById('ord-customer').value.trim();
+    if(!customer) return;
+
+    if(!editingContext.docId) {
+        let prefix = customer.split(' ').filter(w => w.length > 0).map(w => w.charAt(0).toUpperCase()).join('').substring(0, 4);
+        if(!prefix) prefix = 'KH';
+        let count = orders.filter(o => o.id && o.id.startsWith('DH' + prefix)).length + 1;
+        document.getElementById('ord-id').value = 'DH' + prefix + String(count).padStart(2, '0');
+    }
+
+    const lastOrder = orders.slice().sort((a,b) => (b.timestamp||0) - (a.timestamp||0)).find(o => o.customer === customer);
+    if(lastOrder) {
+        document.getElementById('ord-phone').value = lastOrder.phone || '';
+        document.getElementById('ord-address').value = lastOrder.address || '';
+        
+        if(!editingContext.docId && currentOrderItems.length === 0) {
+            if(confirm(`Khách hàng ${customer} đã từng mua hàng. Bạn có muốn tải lại danh sách mặt hàng họ đã mua lần gần nhất không?`)) {
+                currentOrderItems = JSON.parse(JSON.stringify(lastOrder.items || []));
+                renderOrderItems();
+            }
+        }
+    }
+}
+
 window.addOrderItem = function() {
     const select = document.getElementById('ord-product-select');
     const priceInput = document.getElementById('ord-item-price');
@@ -788,16 +813,18 @@ window.handleOrderSubmit = async function(e) {
     const address = document.getElementById('ord-address').value;
     const deliveryDate = document.getElementById('ord-date').value;
     const shipping = parseInt(document.getElementById('ord-shipping').value) || 0;
-    const isDebt = document.getElementById('ord-debt-check').checked;
+    const paidAmount = parseInt(document.getElementById('ord-paid').value) || 0;
     
     const productTotal = currentOrderItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const totalAmount = productTotal + shipping;
-    const status = isDebt ? 'Chưa thanh toán' : 'Hoàn thành';
+    
+    const debtAmount = totalAmount - paidAmount;
+    const status = debtAmount > 0 ? 'Chưa thanh toán' : 'Hoàn thành';
     
     if(editingContext.docId) {
         const oldOrder = editingContext.oldData;
         const data = {
-            deliveryDate, customer, phone, address, shipping, total: totalAmount, status, items: currentOrderItems
+            deliveryDate, customer, phone, address, shipping, total: totalAmount, paid: paidAmount, status, items: currentOrderItems
         };
         if(customId) data.id = customId;
 
@@ -818,11 +845,28 @@ window.handleOrderSubmit = async function(e) {
         }
         
         await db.collection('orders').doc(editingContext.docId).update(data);
+        
+        let existingDebt = debts.find(d => d.desc && d.desc.includes(`Đơn hàng ${oldOrder.id}`));
+        if(debtAmount > 0) {
+            if(existingDebt) {
+                await db.collection('debts').doc(existingDebt.docId).update({ amount: debtAmount, status: 'Chưa thanh toán' });
+            } else {
+                await db.collection('debts').add({
+                    id: 'CN' + String(debts.length + 1).padStart(3, '0'),
+                    date: getTodayDate(), partner: customer, type: 'Khách nợ', amount: debtAmount,
+                    desc: `Đơn hàng ${customId}`, status: 'Chưa thanh toán', timestamp: Date.now()
+                });
+            }
+        } else {
+            if(existingDebt) {
+                await db.collection('debts').doc(existingDebt.docId).update({ status: 'Đã thanh toán' });
+            }
+        }
     } else {
         if(!customId) customId = 'DH' + String(orders.length + 1).padStart(3, '0');
         const newOrder = {
             id: customId, date: getTodayDate(), deliveryDate, customer, phone, address, shipping,
-            total: totalAmount, status, items: currentOrderItems, timestamp: Date.now()
+            total: totalAmount, paid: paidAmount, status, items: currentOrderItems, timestamp: Date.now()
         };
         
         currentOrderItems.forEach(async (orderItem) => {
@@ -834,10 +878,10 @@ window.handleOrderSubmit = async function(e) {
 
         await db.collection('orders').add(newOrder);
         
-        if(isDebt) {
+        if(debtAmount > 0) {
             await db.collection('debts').add({
                 id: 'CN' + String(debts.length + 1).padStart(3, '0'),
-                date: getTodayDate(), partner: customer, type: 'Khách nợ', amount: totalAmount,
+                date: getTodayDate(), partner: customer, type: 'Khách nợ', amount: debtAmount,
                 desc: `Đơn hàng ${customId}`, status: 'Chưa thanh toán', timestamp: Date.now()
             });
         }
