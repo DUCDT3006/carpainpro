@@ -1,29 +1,27 @@
 // --- INITIALIZATION ---
 lucide.createIcons();
 
-// --- STATE MANAGEMENT (Mock Data) ---
-let inventory = [
-    { id: 1, date: '21/5', code: 'DX0132', unit: '1 LÍT', qty: 2, inPrice: 300000, outPrice: 500000, supplier: 'SƠN AN KHÁNH' }, // Tồn ít để test cảnh báo
-    { id: 2, date: '21/5', code: 'DX5110', unit: '1 LÍT', qty: 5, inPrice: 400000, outPrice: 600000, supplier: 'SƠN AN KHÁNH' },
-    { id: 3, date: '21/5', code: 'DX5132', unit: '1 LÍT', qty: 5, inPrice: 500000, outPrice: 700000, supplier: 'SƠN AN KHÁNH' },
-    { id: 4, date: '21/5', code: 'DX5225', unit: '1 LÍT', qty: 5, inPrice: 600000, outPrice: 800000, supplier: 'SƠN AN KHÁNH' },
-    { id: 5, date: '21/5', code: 'DX5226', unit: '1 LÍT', qty: 5, inPrice: 700000, outPrice: 900000, supplier: 'SƠN AN KHÁNH' },
-    { id: 6, date: '21/5', code: 'DX44', unit: 'LOẠI 4 LÍT', qty: 5, inPrice: 1050000, outPrice: 1250000, supplier: 'SƠN AN KHÁNH' }
-];
+const firebaseConfig = {
+    apiKey: "AIzaSyCIi5rpiOIFL1IGj7POL6gQ5uKh0kZSV8s",
+    authDomain: "carpaintpro-33c30.firebaseapp.com",
+    projectId: "carpaintpro-33c30",
+    storageBucket: "carpaintpro-33c30.firebasestorage.app",
+    messagingSenderId: "784738601103",
+    appId: "1:784738601103:web:ea9fc9c7358b5cdca1c8fa",
+    measurementId: "G-00Z8438E4C"
+};
 
-let orders = [
-    { id: 'DH001', deliveryDate: '2026-05-22', customer: 'Gara Thành Đạt', shipping: 50000, total: 1100000, status: 'Hoàn thành' },
-];
+// Khởi tạo Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-let expenses = [
-    { id: 1, date: '21/5/2026', type: 'Cố định', desc: 'Tiền thuê mặt bằng tháng 5', amount: 15000000 },
-];
+// --- STATE MANAGEMENT ---
+let inventory = [];
+let orders = [];
+let expenses = [];
+let debts = [];
 
-let debts = [
-    { id: 'CN001', date: '20/5/2026', partner: 'Gara Hưng Phát', type: 'Khách nợ', amount: 3500000, desc: 'Đơn DH000', status: 'Chưa thanh toán' }
-];
-
-// Current order being created
+// Order đang được tạo
 let currentOrderItems = [];
 
 // --- FORMATTING UTILS ---
@@ -39,7 +37,6 @@ const getTodayDateISO = () => {
     return new Date().toISOString().split('T')[0];
 };
 
-// Preset today's date in order modal
 document.getElementById('ord-date').value = getTodayDateISO();
 
 // --- NAVIGATION LOGIC ---
@@ -49,14 +46,10 @@ const pageTitle = document.getElementById('page-title');
 
 navItems.forEach(item => {
     item.addEventListener('click', () => {
-        // Update active nav
         navItems.forEach(nav => nav.classList.remove('active'));
         item.classList.add('active');
-
-        // Update page title
         pageTitle.textContent = item.textContent.trim();
 
-        // Switch section
         const targetId = item.getAttribute('data-target');
         pageSections.forEach(section => {
             section.classList.remove('active');
@@ -64,9 +57,6 @@ navItems.forEach(item => {
                 section.classList.add('active');
             }
         });
-
-        // Re-render specific sections if needed
-        if (targetId === 'dashboard') renderDashboard();
     });
 });
 
@@ -75,14 +65,12 @@ navItems.forEach(item => {
 function renderDashboard() {
     let totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
     
-    // Total cost = Inventory Cost + Expenses
     let inventoryCost = inventory.reduce((sum, item) => sum + (item.qty * item.inPrice), 0);
     let totalExpense = expenses.reduce((sum, exp) => sum + exp.amount, 0);
     let totalCost = inventoryCost + totalExpense;
 
     let totalProfit = totalRevenue - totalCost;
     
-    // Total Debts (Khách nợ - Nợ NCC)
     let totalDebt = debts.reduce((sum, d) => {
         if(d.type === 'Khách nợ' && d.status === 'Chưa thanh toán') return sum + d.amount;
         if(d.type === 'Nợ NCC' && d.status === 'Chưa thanh toán') return sum - d.amount;
@@ -96,14 +84,14 @@ function renderDashboard() {
     document.getElementById('stat-orders').textContent = orders.length;
     document.getElementById('stat-debts').textContent = formatCurrency(totalDebt);
 
-    // Recent Transactions
+    // Lịch sử giao dịch
     const recentList = document.getElementById('recent-transactions');
     recentList.innerHTML = '';
     
     const allTransactions = [
-        ...orders.map(o => ({ type: 'Thu', desc: `Đơn hàng ${o.id} - ${o.customer}`, amount: o.total, date: o.date })),
-        ...expenses.map(e => ({ type: 'Chi', desc: e.desc, amount: -e.amount, date: e.date }))
-    ].sort((a,b) => 1); // Mock sorting
+        ...orders.map(o => ({ type: 'Thu', desc: `Đơn hàng ${o.id} - ${o.customer}`, amount: o.total, date: o.date, ts: o.timestamp })),
+        ...expenses.map(e => ({ type: 'Chi', desc: e.desc, amount: -e.amount, date: e.date, ts: e.timestamp }))
+    ].sort((a,b) => (b.ts || 0) - (a.ts || 0)); // Sort by timestamp descending
 
     allTransactions.slice(0, 5).forEach(t => {
         const li = document.createElement('li');
@@ -119,10 +107,10 @@ function renderDashboard() {
         recentList.appendChild(li);
     });
 
-    // Low Stock Alerts
+    // Cảnh báo hết hàng
     const lowStockList = document.getElementById('low-stock-list');
     lowStockList.innerHTML = '';
-    const lowStockItems = inventory.filter(i => i.qty <= 3); // Threshold for low stock warning
+    const lowStockItems = inventory.filter(i => i.qty <= 3); 
     
     if (lowStockItems.length === 0) {
         lowStockList.innerHTML = '<li class="text-muted">Không có mặt hàng nào sắp hết.</li>';
@@ -138,6 +126,44 @@ function renderDashboard() {
     }
 }
 
+// --- FIREBASE LISTENERS ---
+db.collection("inventory").onSnapshot((snapshot) => {
+    inventory = [];
+    snapshot.forEach(doc => {
+        inventory.push({ docId: doc.id, ...doc.data() });
+    });
+    renderInventory();
+    renderDashboard();
+});
+
+db.collection("orders").onSnapshot((snapshot) => {
+    orders = [];
+    snapshot.forEach(doc => {
+        orders.push({ docId: doc.id, ...doc.data() });
+    });
+    renderOrders();
+    renderDashboard();
+});
+
+db.collection("debts").onSnapshot((snapshot) => {
+    debts = [];
+    snapshot.forEach(doc => {
+        debts.push({ docId: doc.id, ...doc.data() });
+    });
+    renderDebts();
+    renderDashboard();
+});
+
+db.collection("expenses").onSnapshot((snapshot) => {
+    expenses = [];
+    snapshot.forEach(doc => {
+        expenses.push({ docId: doc.id, ...doc.data() });
+    });
+    renderExpenses();
+    renderDashboard();
+});
+
+
 // --- INVENTORY LOGIC ---
 function renderInventory() {
     const tbody = document.getElementById('inventory-tbody');
@@ -145,7 +171,6 @@ function renderInventory() {
     
     inventory.forEach(item => {
         const tr = document.createElement('tr');
-        // Highlight row if stock is low
         if(item.qty <= 3) tr.className = 'row-warning';
         
         tr.innerHTML = `
@@ -159,27 +184,23 @@ function renderInventory() {
         `;
         tbody.appendChild(tr);
     });
-
-    // Update order modal select
     updateOrderSelect();
 }
 
-function handleInventorySubmit(e) {
+window.handleInventorySubmit = function(e) {
     e.preventDefault();
     const newItem = {
-        id: Date.now(),
         date: getTodayDate(),
         code: document.getElementById('inv-code').value.toUpperCase(),
         unit: document.getElementById('inv-unit').value.toUpperCase(),
         qty: parseInt(document.getElementById('inv-qty').value),
         inPrice: parseInt(document.getElementById('inv-in-price').value),
         outPrice: parseInt(document.getElementById('inv-out-price').value),
-        supplier: document.getElementById('inv-supplier').value.toUpperCase()
+        supplier: document.getElementById('inv-supplier').value.toUpperCase(),
+        timestamp: Date.now()
     };
 
-    inventory.push(newItem);
-    renderInventory();
-    renderDashboard();
+    db.collection('inventory').add(newItem);
     closeModal('inventory-modal');
     e.target.reset();
 }
@@ -213,7 +234,7 @@ function updateOrderSelect() {
     });
 }
 
-function addOrderItem() {
+window.addOrderItem = function() {
     const select = document.getElementById('ord-product-select');
     const qtyInput = document.getElementById('ord-qty');
     
@@ -243,7 +264,7 @@ function addOrderItem() {
     select.value = "";
 }
 
-function renderOrderItems() {
+window.renderOrderItems = function() {
     const list = document.getElementById('ord-items-list');
     list.innerHTML = '';
     let productTotal = 0;
@@ -263,10 +284,8 @@ function renderOrderItems() {
     });
     lucide.createIcons();
     
-    // Thêm phí ship
     const shippingCost = parseInt(document.getElementById('ord-shipping').value) || 0;
     const totalAmount = productTotal + shippingCost;
-    
     document.getElementById('ord-total-amount').textContent = formatCurrency(totalAmount);
 }
 
@@ -275,7 +294,7 @@ window.removeOrderItem = function(index) {
     renderOrderItems();
 }
 
-function handleOrderSubmit(e) {
+window.handleOrderSubmit = async function(e) {
     e.preventDefault();
     if(currentOrderItems.length === 0) return alert('Vui lòng thêm ít nhất 1 sản phẩm');
 
@@ -287,66 +306,59 @@ function handleOrderSubmit(e) {
     const productTotal = currentOrderItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const totalAmount = productTotal + shipping;
     
-    // Deduct inventory
-    currentOrderItems.forEach(orderItem => {
+    // Deduct inventory in Firebase
+    currentOrderItems.forEach(async (orderItem) => {
         let invItem = inventory.find(i => i.code === orderItem.code);
-        if(invItem) invItem.qty -= orderItem.qty;
+        if(invItem) {
+            await db.collection('inventory').doc(invItem.docId).update({
+                qty: invItem.qty - orderItem.qty
+            });
+        }
     });
 
+    // Generate pseudo-ID
     const newOrderId = 'DH' + String(orders.length + 1).padStart(3, '0');
     
     const newOrder = {
         id: newOrderId,
+        date: getTodayDate(),
         deliveryDate: deliveryDate,
         customer: customer,
         shipping: shipping,
         total: totalAmount,
-        status: isDebt ? 'Chưa thanh toán' : 'Hoàn thành'
+        status: isDebt ? 'Chưa thanh toán' : 'Hoàn thành',
+        timestamp: Date.now()
     };
 
-    orders.push(newOrder);
+    await db.collection('orders').add(newOrder);
     
-    // Create debt if checked
     if(isDebt) {
-        debts.push({
+        await db.collection('debts').add({
             id: 'CN' + String(debts.length + 1).padStart(3, '0'),
             date: getTodayDate(),
             partner: customer,
             type: 'Khách nợ',
             amount: totalAmount,
             desc: `Đơn hàng ${newOrderId}`,
-            status: 'Chưa thanh toán'
+            status: 'Chưa thanh toán',
+            timestamp: Date.now()
         });
-        renderDebts();
     }
     
-    // Reset form
     currentOrderItems = [];
     e.target.reset();
     document.getElementById('ord-date').value = getTodayDateISO();
     renderOrderItems();
     closeModal('order-modal');
     
-    // Refresh all views
-    renderOrders();
-    renderInventory();
-    renderDashboard();
-    
-    // Check if any item is low stock and warn user
+    // Cảnh báo hết hàng
     const lowStockAlerts = inventory.filter(i => i.qty <= 3 && i.qty > 0);
     const outOfStockAlerts = inventory.filter(i => i.qty === 0);
     
     let alertMsg = 'Lên đơn hàng thành công!\n';
-    if(outOfStockAlerts.length > 0) {
-        alertMsg += `\n⚠️ CẢNH BÁO: Đã hết hàng: ${outOfStockAlerts.map(i=>i.code).join(', ')}`;
-    }
-    if(lowStockAlerts.length > 0) {
-        alertMsg += `\n⚠️ Sắp hết hàng: ${lowStockAlerts.map(i=>i.code).join(', ')}`;
-    }
-    
-    if(outOfStockAlerts.length > 0 || lowStockAlerts.length > 0) {
-        alert(alertMsg);
-    }
+    if(outOfStockAlerts.length > 0) alertMsg += `\n⚠️ CẢNH BÁO: Đã hết hàng: ${outOfStockAlerts.map(i=>i.code).join(', ')}`;
+    if(lowStockAlerts.length > 0) alertMsg += `\n⚠️ Sắp hết hàng: ${lowStockAlerts.map(i=>i.code).join(', ')}`;
+    if(outOfStockAlerts.length > 0 || lowStockAlerts.length > 0) alert(alertMsg);
 }
 
 // --- DEBTS LOGIC ---
@@ -369,7 +381,7 @@ function renderDebts() {
     });
 }
 
-function handleDebtSubmit(e) {
+window.handleDebtSubmit = function(e) {
     e.preventDefault();
     const newDebt = {
         id: 'CN' + String(debts.length + 1).padStart(3, '0'),
@@ -378,12 +390,11 @@ function handleDebtSubmit(e) {
         type: document.getElementById('debt-type').value,
         amount: parseInt(document.getElementById('debt-amount').value),
         desc: document.getElementById('debt-desc').value,
-        status: 'Chưa thanh toán'
+        status: 'Chưa thanh toán',
+        timestamp: Date.now()
     };
 
-    debts.push(newDebt);
-    renderDebts();
-    renderDashboard();
+    db.collection('debts').add(newDebt);
     closeModal('debt-modal');
     e.target.reset();
 }
@@ -406,19 +417,17 @@ function renderExpenses() {
     });
 }
 
-function handleExpenseSubmit(e) {
+window.handleExpenseSubmit = function(e) {
     e.preventDefault();
     const newExpense = {
-        id: Date.now(),
         date: getTodayDate(),
         type: document.getElementById('exp-type').value,
         desc: document.getElementById('exp-desc').value,
-        amount: parseInt(document.getElementById('exp-amount').value)
+        amount: parseInt(document.getElementById('exp-amount').value),
+        timestamp: Date.now()
     };
 
-    expenses.push(newExpense);
-    renderExpenses();
-    renderDashboard();
+    db.collection('expenses').add(newExpense);
     closeModal('expense-modal');
     e.target.reset();
 }
@@ -440,10 +449,3 @@ document.querySelectorAll('.modal-overlay').forEach(modal => {
         }
     });
 });
-
-// --- INITIAL RENDER ---
-renderInventory();
-renderOrders();
-renderDebts();
-renderExpenses();
-renderDashboard();
