@@ -466,10 +466,11 @@ function renderPurchaseOrders() {
 }
 
 function updatePurchaseSelect() {
-    const select = document.getElementById('pur-product-select');
-    select.innerHTML = '<option value="">-- Chọn sản phẩm --</option>';
+    const dataList = document.getElementById('inventory-list-all');
+    if(!dataList) return;
+    dataList.innerHTML = '';
     inventory.forEach(item => {
-        select.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit}</option>`;
+        dataList.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit}</option>`;
     });
 }
 
@@ -631,11 +632,12 @@ window.toggleOrderStatus = async function(docId, currentStatus) {
 }
 
 function updateOrderSelect() {
-    const select = document.getElementById('ord-product-select');
-    select.innerHTML = '<option value="">-- Chọn sản phẩm --</option>';
+    const dataList = document.getElementById('inventory-list-instock');
+    if(!dataList) return;
+    dataList.innerHTML = '';
     inventory.forEach(item => {
         if(item.qty > 0) {
-            select.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit} (Tồn: ${item.qty})</option>`;
+            dataList.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit} (Tồn: ${item.qty})</option>`;
         }
     });
 }
