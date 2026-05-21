@@ -630,6 +630,13 @@ window.handlePurchaseSubmit = async function(e) {
         await db.collection('purchaseOrders').add(newOrder);
     }
     
+    const existingPartner = partners.find(p => p.type === 'Nhà cung cấp' && p.name.toUpperCase() === supplier.toUpperCase());
+    if(!existingPartner) {
+        await db.collection('partners').add({
+            type: 'Nhà cung cấp', name: supplier, phone: '', address: '', timestamp: Date.now()
+        });
+    }
+    
     closeModal('purchase-modal');
 }
 
@@ -910,6 +917,19 @@ window.handleOrderSubmit = async function(e) {
                 desc: `Đơn hàng ${customId}`, status: 'Chưa thanh toán', timestamp: Date.now()
             });
         }
+    }
+    
+    // Auto-save/update partner info
+    const existingPartner = partners.find(p => p.type === 'Khách hàng' && p.name.toUpperCase() === customer.toUpperCase());
+    if(!existingPartner) {
+        await db.collection('partners').add({
+            type: 'Khách hàng', name: customer, phone, address, timestamp: Date.now()
+        });
+    } else if ((phone && existingPartner.phone !== phone) || (address && existingPartner.address !== address)) {
+        await db.collection('partners').doc(existingPartner.docId).update({
+            phone: phone || existingPartner.phone,
+            address: address || existingPartner.address
+        });
     }
     
     closeModal('order-modal');
