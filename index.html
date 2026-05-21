@@ -118,6 +118,7 @@
                             <thead>
                                 <tr>
                                     <th>Mã SP</th>
+                                    <th>Tên SP</th>
                                     <th>Đơn vị tính</th>
                                     <th>SL tồn</th>
                                     <th>Giá nhập</th>
@@ -254,14 +255,22 @@
             </div>
             <form id="inventory-form" onsubmit="handleInventorySubmit(event)">
                 <div class="form-group">
-                    <label>Mã SP</label>
-                    <input type="text" id="inv-code" required placeholder="VD: DX0132">
+                    <label>Tên sản phẩm</label>
+                    <input type="text" id="inv-name" required placeholder="VD: Sơn lót xám" oninput="generateProductCode()">
                 </div>
                 <div class="form-group-row">
-                    <div class="form-group">
-                        <label>Đơn vị tính</label>
-                        <input type="text" id="inv-unit" required placeholder="1 LÍT">
+                    <div class="form-group" style="flex:2">
+                        <label>Mã SP</label>
+                        <div style="display:flex; gap: 8px;">
+                            <input type="text" id="inv-code" required placeholder="Tự động sinh..." readonly style="flex:1">
+                            <button type="button" class="btn-secondary" onclick="document.getElementById('inv-code').removeAttribute('readonly'); document.getElementById('inv-code').focus();" title="Sửa mã thủ công"><i data-lucide="edit-2" style="width:18px"></i></button>
+                        </div>
                     </div>
+                    <div class="form-group" style="flex:1">
+                        <label>Đơn vị</label>
+                        <input type="text" id="inv-unit" required placeholder="LÍT">
+                    </div>
+                </div>
                     <div class="form-group">
                         <label>Số lượng tồn</label>
                         <input type="number" id="inv-qty" required min="0" value="0">
@@ -301,7 +310,7 @@
                     </div>
                     <div class="form-group" style="flex:2">
                         <label>Nhà cung cấp</label>
-                        <input type="text" id="pur-supplier" required placeholder="SƠN AN KHÁNH">
+                        <input type="text" id="pur-supplier" list="supplier-list" required placeholder="Gõ / Chọn nhà cung cấp">
                     </div>
                     <div class="form-group" style="flex:1">
                         <label>Ngày đặt hàng</label>
@@ -321,7 +330,7 @@
                         <div class="form-group" style="flex:1">
                             <input type="number" id="pur-qty" placeholder="SL" min="1" value="1">
                         </div>
-                        <button type="button" class="btn-secondary" style="margin-bottom:1px;" onclick="addPurchaseItem()">Thêm</button>
+                        <button type="button" class="btn-secondary" style="margin-bottom:1px; padding: 10px;" onclick="addPurchaseItem()" title="Thêm vào đơn"><i data-lucide="plus"></i></button>
                     </div>
                     <ul id="pur-items-list" class="order-items-list">
                         <!-- Added items go here -->
@@ -348,7 +357,7 @@
                     </div>
                     <div class="form-group" style="flex:2">
                         <label>Tên khách hàng</label>
-                        <input type="text" id="ord-customer" required placeholder="Nguyễn Văn A">
+                        <input type="text" id="ord-customer" list="customer-list" required placeholder="Gõ / Chọn khách hàng">
                     </div>
                     <div class="form-group" style="flex:1">
                         <label>Ngày giao</label>
@@ -378,7 +387,7 @@
                         <div class="form-group" style="flex:1">
                             <input type="number" id="ord-qty" placeholder="SL" min="1" value="1">
                         </div>
-                        <button type="button" class="btn-secondary" style="margin-bottom:1px;" onclick="addOrderItem()">Thêm</button>
+                        <button type="button" class="btn-secondary" style="margin-bottom:1px; padding: 10px;" onclick="addOrderItem()" title="Thêm vào đơn"><i data-lucide="plus"></i></button>
                     </div>
                     <ul id="ord-items-list" class="order-items-list">
                         <!-- Added items go here -->
@@ -470,6 +479,8 @@
     <!-- Datalists for Autocomplete -->
     <datalist id="inventory-list-all"></datalist>
     <datalist id="inventory-list-instock"></datalist>
+    <datalist id="supplier-list"></datalist>
+    <datalist id="customer-list"></datalist>
 
     <!-- Firebase SDK (v8 compat cho cấu trúc code hiện tại) -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>

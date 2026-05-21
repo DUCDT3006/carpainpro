@@ -88,7 +88,9 @@ window.openEditModal = function(collection, docId) {
     if(collection === 'inventory') {
         const item = inventory.find(i => i.docId === docId);
         editingContext.oldData = item;
+        document.getElementById('inv-name').value = item.name || '';
         document.getElementById('inv-code').value = item.code;
+        document.getElementById('inv-code').setAttribute('readonly', true);
         document.getElementById('inv-unit').value = item.unit;
         document.getElementById('inv-qty').value = item.qty;
         document.getElementById('inv-in-price').value = item.inPrice;
@@ -167,6 +169,7 @@ window.resetFormUI = function(modalId) {
         modal.querySelector('h2').textContent = 'Khai báo vật tư mới';
         modal.querySelector('button[type="submit"]').textContent = 'Lưu vật tư';
         document.getElementById('inventory-form').reset();
+        document.getElementById('inv-code').setAttribute('readonly', true);
     }
     else if(modalId === 'expense-modal') {
         modal.querySelector('h2').textContent = 'Thêm khoản chi phí';
@@ -269,6 +272,7 @@ db.collection("inventory").onSnapshot((snapshot) => {
     renderDashboard();
     updateOrderSelect();
     updatePurchaseSelect();
+    updateSupplierList();
 });
 
 db.collection("orders").onSnapshot((snapshot) => {
@@ -276,6 +280,7 @@ db.collection("orders").onSnapshot((snapshot) => {
     snapshot.forEach(doc => orders.push({ docId: doc.id, ...doc.data() }));
     renderOrders();
     renderDashboard();
+    updateCustomerList();
 });
 
 db.collection("purchaseOrders").onSnapshot((snapshot) => {
@@ -283,6 +288,7 @@ db.collection("purchaseOrders").onSnapshot((snapshot) => {
     snapshot.forEach(doc => purchaseOrders.push({ docId: doc.id, ...doc.data() }));
     renderPurchaseOrders();
     renderDashboard();
+    updateSupplierList();
 });
 
 db.collection("debts").onSnapshot((snapshot) => {
@@ -301,6 +307,16 @@ db.collection("expenses").onSnapshot((snapshot) => {
 
 
 // --- INVENTORY LOGIC ---
+window.generateProductCode = function() {
+    if(editingContext.docId) return; 
+    const name = document.getElementById('inv-name').value.trim();
+    if(!name) { document.getElementById('inv-code').value = ''; return; }
+    
+    let codePrefix = name.split(' ').filter(w => w.length > 0).map(w => w.charAt(0).toUpperCase()).join('').substring(0, 4);
+    let count = inventory.filter(i => i.code && i.code.startsWith(codePrefix)).length + 1;
+    document.getElementById('inv-code').value = codePrefix + String(count).padStart(2, '0');
+}
+
 function renderInventory() {
     const tbody = document.getElementById('inventory-tbody');
     tbody.innerHTML = '';
@@ -311,6 +327,7 @@ function renderInventory() {
         
         tr.innerHTML = `
             <td class="font-semibold text-primary">${item.code}</td>
+            <td class="font-semibold">${item.name || ''}</td>
             <td>${item.unit}</td>
             <td class="${item.qty <= 3 ? 'text-warning font-bold' : ''}">${item.qty}</td>
             <td>${formatCurrency(item.inPrice)}</td>
@@ -328,8 +345,21 @@ function renderInventory() {
 
 window.handleInventorySubmit = async function(e) {
     e.preventDefault();
+    const newCode = document.getElementById('inv-code').value.toUpperCase().trim();
+    const newName = document.getElementById('inv-name').value.trim();
+    
+    if(!editingContext.docId) {
+        if(inventory.find(i => i.code === newCode)) {
+            return alert('Lỗi: Mã sản phẩm này đã tồn tại!');
+        }
+        if(inventory.find(i => i.name && i.name.toUpperCase() === newName.toUpperCase())) {
+            if(!confirm('Cảnh báo: Tên sản phẩm này có vẻ đã tồn tại trong kho! Bạn có chắc muốn tạo mã mới?')) return;
+        }
+    }
+
     const data = {
-        code: document.getElementById('inv-code').value.toUpperCase(),
+        code: newCode,
+        name: newName,
         unit: document.getElementById('inv-unit').value.toUpperCase(),
         qty: parseInt(document.getElementById('inv-qty').value) || 0,
         inPrice: parseInt(document.getElementById('inv-in-price').value),
@@ -339,9 +369,9 @@ window.handleInventorySubmit = async function(e) {
     };
 
     if(editingContext.docId) {
-        await db.collection('inventory').doc(editingContext.docId).update(data).catch(e => alert("Lỗi lưu dữ liệu lên Cloud: " + e.message));
+        await db.collection('inventory').doc(editingContext.docId).update(data).catch(e => alert("Lỗi: " + e.message));
     } else {
-        await db.collection('inventory').add(data).catch(e => alert("Lỗi lưu dữ liệu lên Cloud: " + e.message));
+        await db.collection('inventory').add(data).catch(e => alert("Lỗi: " + e.message));
     }
     
     closeModal('inventory-modal');
@@ -465,21 +495,34 @@ function renderPurchaseOrders() {
     lucide.createIcons();
 }
 
+function updateSupplierList() {
+    const list = document.getElementById('supplier-list');
+    if(!list) return;
+    let suppliers = new Set();
+    inventory.forEach(i => { if(i.supplier) suppliers.add(i.supplier); });
+    purchaseOrders.forEach(p => { if(p.supplier) suppliers.add(p.supplier); });
+    list.innerHTML = '';
+    suppliers.forEach(s => {
+        list.innerHTML += `<option value="${s}">`;
+    });
+}
+
 function updatePurchaseSelect() {
     const dataList = document.getElementById('inventory-list-all');
     if(!dataList) return;
     dataList.innerHTML = '';
     inventory.forEach(item => {
-        dataList.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit}</option>`;
+        dataList.innerHTML += `<option value="${item.code}">${item.code} - ${item.name || ''} (${item.unit})</option>`;
     });
 }
 
 window.fillPurchasePrice = function() {
-    let code = document.getElementById('pur-product-select').value;
+    let inputValue = document.getElementById('pur-product-select').value;
     const priceInput = document.getElementById('pur-item-price');
-    if(!code) { priceInput.value = ''; return; }
-    code = code.toUpperCase().trim();
-    const product = inventory.find(i => i.code === code);
+    if(!inputValue) { priceInput.value = ''; return; }
+    
+    inputValue = inputValue.split(' - ')[0].trim().toUpperCase();
+    const product = inventory.find(i => i.code === inputValue || (i.name && i.name.toUpperCase() === inputValue));
     if(product) priceInput.value = product.inPrice;
 }
 
@@ -488,20 +531,22 @@ window.addPurchaseItem = function() {
     const priceInput = document.getElementById('pur-item-price');
     const qtyInput = document.getElementById('pur-qty');
     
-    const code = select.value.toUpperCase().trim();
+    let inputValue = select.value.split(' - ')[0].trim().toUpperCase();
     const price = parseInt(priceInput.value);
     const qty = parseInt(qtyInput.value);
 
-    if(!code || qty < 1 || isNaN(price)) return alert('Vui lòng chọn SP, giá và số lượng hợp lệ');
+    if(!inputValue || qty < 1 || isNaN(price)) return alert('Vui lòng chọn SP, giá và số lượng hợp lệ');
 
-    const product = inventory.find(i => i.code === code);
+    let product = inventory.find(i => i.code === inputValue || (i.name && i.name.toUpperCase() === inputValue));
+    if(!product) return alert('Sản phẩm chưa có trong kho!');
     
+    const code = product.code;
     const existingItem = currentPurchaseItems.find(i => i.code === code);
     if(existingItem) {
         existingItem.qty += qty;
         existingItem.price = price;
     } else {
-        currentPurchaseItems.push({ code: product.code, name: `${product.code} - ${product.unit}`, price: price, qty: qty });
+        currentPurchaseItems.push({ code: product.code, name: product.name ? `${product.code} - ${product.name}` : `${product.code} - ${product.unit}`, price: price, qty: qty });
     }
     renderPurchaseItems();
     qtyInput.value = 1; select.value = ""; priceInput.value = "";
@@ -632,21 +677,33 @@ window.toggleOrderStatus = async function(docId, currentStatus) {
     await db.collection('orders').doc(docId).update({ status: newStatus });
 }
 
+function updateCustomerList() {
+    const list = document.getElementById('customer-list');
+    if(!list) return;
+    let customers = new Set();
+    orders.forEach(o => { if(o.customer) customers.add(o.customer); });
+    list.innerHTML = '';
+    customers.forEach(c => {
+        list.innerHTML += `<option value="${c}">`;
+    });
+}
+
 function updateOrderSelect() {
     const dataList = document.getElementById('inventory-list-instock');
     if(!dataList) return;
     dataList.innerHTML = '';
     inventory.forEach(item => {
-        dataList.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit} (Tồn: ${item.qty})</option>`;
+        dataList.innerHTML += `<option value="${item.code}">${item.code} - ${item.name || ''} (Tồn: ${item.qty})</option>`;
     });
 }
 
 window.fillOrderPrice = function() {
-    let code = document.getElementById('ord-product-select').value;
+    let inputValue = document.getElementById('ord-product-select').value;
     const priceInput = document.getElementById('ord-item-price');
-    if(!code) { priceInput.value = ''; return; }
-    code = code.toUpperCase().trim();
-    const product = inventory.find(i => i.code === code);
+    if(!inputValue) { priceInput.value = ''; return; }
+    
+    inputValue = inputValue.split(' - ')[0].trim().toUpperCase();
+    const product = inventory.find(i => i.code === inputValue || (i.name && i.name.toUpperCase() === inputValue));
     if(product) priceInput.value = product.outPrice;
 }
 
@@ -655,22 +712,43 @@ window.addOrderItem = function() {
     const priceInput = document.getElementById('ord-item-price');
     const qtyInput = document.getElementById('ord-qty');
     
-    const code = select.value.toUpperCase().trim();
-    const price = parseInt(priceInput.value);
-    const qty = parseInt(qtyInput.value);
+    let inputValue = select.value.trim();
+    if(!inputValue) return alert('Vui lòng chọn hoặc nhập SP');
+    
+    let searchVal = inputValue.split(' - ')[0].trim().toUpperCase();
+    const price = parseInt(priceInput.value) || 0;
+    const qty = parseInt(qtyInput.value) || 1;
 
-    if(!code || qty < 1 || isNaN(price)) return alert('Vui lòng chọn SP, Giá và số lượng hợp lệ');
+    let product = inventory.find(i => i.code === searchVal || (i.name && i.name.toUpperCase() === inputValue.toUpperCase()));
+    
+    if(!product) {
+        if(confirm(`"${inputValue}" là sản phẩm mới. Hệ thống sẽ tự tạo mã và thêm vào kho. Bạn có đồng ý không?`)) {
+            let codePrefix = inputValue.split(' ').filter(w => w.length > 0).map(w => w.charAt(0).toUpperCase()).join('').substring(0, 4);
+            let count = inventory.filter(i => i.code && i.code.startsWith(codePrefix)).length + 1;
+            let newCode = codePrefix + String(count).padStart(2, '0');
+            
+            product = {
+                name: inputValue, code: newCode, unit: 'CÁI',
+                qty: 0, inPrice: price, outPrice: price,
+                supplier: 'Chưa rõ', timestamp: Date.now()
+            };
+            db.collection('inventory').add(product);
+        } else {
+            return;
+        }
+    } else {
+        if(qty > product.qty) {
+             if(!confirm(`Tồn kho hiện tại (${product.qty}) không đủ. Bạn có muốn bán quá số lượng kho?`)) return;
+        }
+    }
 
-    const product = inventory.find(i => i.code === code);
-    if(qty > product.qty) return alert(`Không đủ tồn kho. Tồn hiện tại: ${product.qty}`);
-
+    const code = product.code;
     const existingItem = currentOrderItems.find(i => i.code === code);
     if(existingItem) {
-        if(existingItem.qty + qty > product.qty) return alert('Tổng số lượng vượt tồn kho');
         existingItem.qty += qty;
         existingItem.price = price; 
     } else {
-        currentOrderItems.push({ code: product.code, name: `${product.code} - ${product.unit}`, price: price, qty: qty });
+        currentOrderItems.push({ code: product.code, name: product.name ? `${product.code} - ${product.name}` : `${product.code} - ${product.unit}`, price: price, qty: qty });
     }
     renderOrderItems();
     qtyInput.value = 1; select.value = ""; priceInput.value = "";
@@ -783,10 +861,10 @@ window.closeModal = function(id) {
 }
 
 document.querySelectorAll('.modal-overlay').forEach(modal => {
-    modal.addEventListener('click', (e) => {
-        if(e.target === modal) {
-            modal.classList.remove('active');
-            resetFormUI(modal.id);
-        }
-    });
+    // modal.addEventListener('click', (e) => {
+    //     if(e.target === modal) {
+    //         modal.classList.remove('active');
+    //         resetFormUI(modal.id);
+    //     }
+    // });
 });

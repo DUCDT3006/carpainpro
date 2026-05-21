@@ -365,7 +365,7 @@ body.dark-theme {
     width: 100%;
     max-width: 500px;
     border-radius: 16px;
-    padding: 30px;
+    padding: 20px;
     border: 1px solid rgba(255,255,255,0.1);
     box-shadow: 0 20px 40px rgba(0,0,0,0.5);
     transform: scale(0.95);
@@ -383,7 +383,7 @@ body.dark-theme {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
 }
 
 .close-btn {
@@ -397,10 +397,10 @@ body.dark-theme {
 
 /* Forms */
 .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .form-group-row {
