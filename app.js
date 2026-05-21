@@ -1,67 +1,19 @@
 // --- INITIALIZATION ---
 lucide.createIcons();
 
-// --- LOCAL STORAGE DATABASE MOCK (Thay thế Firebase) ---
-const db = {
-    collection: function(name) {
-        return {
-            onSnapshot: function(callback) {
-                const triggerCallback = () => {
-                    const data = JSON.parse(localStorage.getItem(name)) || [];
-                    const snapshot = {
-                        forEach: function(cb) {
-                            data.forEach(item => cb({ id: item.docId, data: () => item }));
-                        }
-                    };
-                    callback(snapshot);
-                };
-                triggerCallback(); // Initial load
-                window.addEventListener(name + 'Changed', triggerCallback);
-            },
-            add: async function(data) {
-                let items = JSON.parse(localStorage.getItem(name)) || [];
-                data.docId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-                items.push(data);
-                localStorage.setItem(name, JSON.stringify(items));
-                window.dispatchEvent(new Event(name + 'Changed'));
-            },
-            doc: function(docId) {
-                return {
-                    update: async function(data) {
-                        let items = JSON.parse(localStorage.getItem(name)) || [];
-                        let index = items.findIndex(i => i.docId === docId);
-                        if(index !== -1) {
-                            items[index] = { ...items[index], ...data };
-                            localStorage.setItem(name, JSON.stringify(items));
-                            window.dispatchEvent(new Event(name + 'Changed'));
-                        }
-                    },
-                    delete: async function() {
-                        let items = JSON.parse(localStorage.getItem(name)) || [];
-                        items = items.filter(i => i.docId !== docId);
-                        localStorage.setItem(name, JSON.stringify(items));
-                        window.dispatchEvent(new Event(name + 'Changed'));
-                    }
-                };
-            },
-            where: function(field, op, value) {
-               return {
-                   get: async function() {
-                       let items = JSON.parse(localStorage.getItem(name)) || [];
-                       let filtered = items.filter(i => {
-                           if(op === '==') return i[field] === value;
-                           return false;
-                       });
-                       return {
-                           empty: filtered.length === 0,
-                           docs: filtered.map(i => ({ id: i.docId, data: () => i }))
-                       };
-                   }
-               };
-            }
-        };
-    }
+// --- FIREBASE INITIALIZATION ---
+const firebaseConfig = {
+  apiKey: "AIzaSyBCRiv_RnxDtqxGuv_LrqMyL84pxok2Lro",
+  authDomain: "carpainpro.firebaseapp.com",
+  projectId: "carpainpro",
+  storageBucket: "carpainpro.firebasestorage.app",
+  messagingSenderId: "51391096074",
+  appId: "1:51391096074:web:411fe7fab73187eda406f3"
 };
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
 // --- STATE MANAGEMENT ---
 let inventory = [];
