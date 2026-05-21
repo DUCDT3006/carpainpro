@@ -748,12 +748,11 @@ window.handleCustomerSelect = function() {
     if(lastOrder) {
         if(!partner && lastOrder.phone) document.getElementById('ord-phone').value = lastOrder.phone;
         if(!partner && lastOrder.address) document.getElementById('ord-address').value = lastOrder.address;
-        
-        if(!editingContext.docId && currentOrderItems.length === 0) {
-            if(confirm(`Khách hàng ${customer} đã từng mua hàng. Bạn có muốn tải lại danh sách mặt hàng họ đã mua lần gần nhất không?`)) {
-                currentOrderItems = JSON.parse(JSON.stringify(lastOrder.items || []));
-                renderOrderItems();
-            }
+        if(!editingContext.docId && currentOrderItems.length === 0 && lastOrder.items && lastOrder.items.length > 0) {
+            const firstItem = lastOrder.items[0];
+            document.getElementById('ord-product-select').value = firstItem.name || firstItem.code;
+            document.getElementById('ord-item-price').value = firstItem.price || '';
+            document.getElementById('ord-qty').value = firstItem.qty || 1;
         }
     }
 }
