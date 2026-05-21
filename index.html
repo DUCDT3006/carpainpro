@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CarPaintPro - Quản lý Cửa Hàng Sơn</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i data-lucide="droplet" class="logo-icon"></i>
+                <h2>CarPaintPro</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-target="dashboard">
+                    <i data-lucide="layout-dashboard"></i> Tổng quan
+                </button>
+                <button class="nav-item" data-target="inventory">
+                    <i data-lucide="package"></i> Quản lý Kho
+                </button>
+                <button class="nav-item" data-target="orders">
+                    <i data-lucide="shopping-cart"></i> Đơn Bán Hàng
+                </button>
+                <button class="nav-item" data-target="debts">
+                    <i data-lucide="file-spreadsheet"></i> Công nợ
+                </button>
+                <button class="nav-item" data-target="expenses">
+                    <i data-lucide="wallet"></i> Quản lý Chi phí
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <p>Mock Data Version</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <h1 id="page-title">Tổng quan</h1>
+                <div class="user-profile">
+                    <img src="https://i.pravatar.cc/150?img=11" alt="User" class="avatar">
+                    <span>Admin</span>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- Dashboard Section -->
+                <section id="dashboard" class="page-section active">
+                    <div class="stats-grid">
+                        <div class="stat-card glass">
+                            <div class="stat-icon revenue-icon"><i data-lucide="trending-up"></i></div>
+                            <div class="stat-info">
+                                <h3>Doanh Thu</h3>
+                                <p id="stat-revenue">0 ₫</p>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon cost-icon"><i data-lucide="trending-down"></i></div>
+                            <div class="stat-info">
+                                <h3>Chi Phí</h3>
+                                <p id="stat-cost">0 ₫</p>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon profit-icon"><i data-lucide="pie-chart"></i></div>
+                            <div class="stat-info">
+                                <h3>Lợi Nhuận</h3>
+                                <p id="stat-profit">0 ₫</p>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon debt-icon" style="background: rgba(236, 72, 153, 0.15); color: #ec4899;"><i data-lucide="banknote"></i></div>
+                            <div class="stat-info">
+                                <h3>Tổng Công Nợ</h3>
+                                <p id="stat-debts">0 ₫</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-row" style="display:flex; gap: 20px;">
+                        <div class="chart-container glass" style="flex:1;">
+                            <h3>Lịch sử giao dịch gần đây</h3>
+                            <ul id="recent-transactions" class="transaction-list">
+                                <!-- JS injected -->
+                            </ul>
+                        </div>
+                        <div class="chart-container glass" style="flex:1;">
+                            <h3 class="text-warning"><i data-lucide="alert-triangle"></i> Cảnh báo Hàng sắp hết</h3>
+                            <ul id="low-stock-list" class="transaction-list">
+                                <!-- JS injected -->
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Inventory Section -->
+                <section id="inventory" class="page-section">
+                    <div class="section-header">
+                        <h2>Danh sách vật tư tồn kho</h2>
+                        <button class="btn-primary" onclick="openModal('inventory-modal')">
+                            <i data-lucide="plus"></i> Nhập hàng mới
+                        </button>
+                    </div>
+                    <div class="table-container glass">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Ngày nhập</th>
+                                    <th>Mã SP</th>
+                                    <th>Đơn vị tính</th>
+                                    <th>SL tồn</th>
+                                    <th>Giá nhập</th>
+                                    <th>Giá bán</th>
+                                    <th>Nhà cung cấp</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-tbody">
+                                <!-- JS injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Orders Section -->
+                <section id="orders" class="page-section">
+                    <div class="section-header">
+                        <h2>Đơn bán hàng</h2>
+                        <button class="btn-primary" onclick="openModal('order-modal')">
+                            <i data-lucide="plus"></i> Tạo đơn hàng
+                        </button>
+                    </div>
+                    <div class="table-container glass">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Mã đơn</th>
+                                    <th>Ngày giao</th>
+                                    <th>Khách hàng</th>
+                                    <th>Phí Ship</th>
+                                    <th>Tổng tiền</th>
+                                    <th>Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-tbody">
+                                <!-- JS injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Debts Section -->
+                <section id="debts" class="page-section">
+                    <div class="section-header">
+                        <h2>Quản lý Công nợ</h2>
+                        <button class="btn-primary" onclick="openModal('debt-modal')">
+                            <i data-lucide="plus"></i> Thêm công nợ
+                        </button>
+                    </div>
+                    <div class="table-container glass">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Mã nợ</th>
+                                    <th>Ngày ghi nhận</th>
+                                    <th>Khách hàng / NCC</th>
+                                    <th>Loại</th>
+                                    <th>Số tiền</th>
+                                    <th>Trạng thái</th>
+                                </tr>
+                            </thead>
+                            <tbody id="debts-tbody">
+                                <!-- JS injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Expenses Section -->
+                <section id="expenses" class="page-section">
+                    <div class="section-header">
+                        <h2>Các khoản chi phí</h2>
+                        <button class="btn-primary" onclick="openModal('expense-modal')">
+                            <i data-lucide="plus"></i> Thêm chi phí
+                        </button>
+                    </div>
+                    <div class="table-container glass">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Ngày</th>
+                                    <th>Loại chi phí</th>
+                                    <th>Mô tả</th>
+                                    <th>Số tiền</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expenses-tbody">
+                                <!-- JS injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Inventory Modal -->
+    <div id="inventory-modal" class="modal-overlay">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h2>Nhập vật tư mới</h2>
+                <button class="close-btn" onclick="closeModal('inventory-modal')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="inventory-form" onsubmit="handleInventorySubmit(event)">
+                <div class="form-group">
+                    <label>Mã SP</label>
+                    <input type="text" id="inv-code" required placeholder="VD: DX0132">
+                </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label>Đơn vị tính</label>
+                        <input type="text" id="inv-unit" required placeholder="1 LÍT">
+                    </div>
+                    <div class="form-group">
+                        <label>Số lượng</label>
+                        <input type="number" id="inv-qty" required min="1">
+                    </div>
+                </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label>Giá nhập</label>
+                        <input type="number" id="inv-in-price" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Giá bán</label>
+                        <input type="number" id="inv-out-price" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Nhà cung cấp</label>
+                    <input type="text" id="inv-supplier" required placeholder="SƠN AN KHÁNH">
+                </div>
+                <button type="submit" class="btn-primary w-full">Lưu vào kho</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Order Modal -->
+    <div id="order-modal" class="modal-overlay">
+        <div class="modal-content glass-modal order-modal">
+            <div class="modal-header">
+                <h2>Tạo đơn bán hàng</h2>
+                <button class="close-btn" onclick="closeModal('order-modal')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="order-form" onsubmit="handleOrderSubmit(event)">
+                <div class="form-group-row">
+                    <div class="form-group" style="flex:2">
+                        <label>Tên khách hàng</label>
+                        <input type="text" id="ord-customer" required placeholder="Nguyễn Văn A">
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label>Ngày giao hàng</label>
+                        <input type="date" id="ord-date" required>
+                    </div>
+                </div>
+                
+                <div class="order-items-section">
+                    <h4>Chọn sản phẩm</h4>
+                    <div class="form-group-row add-item-row">
+                        <select id="ord-product-select">
+                            <!-- Populated by JS -->
+                        </select>
+                        <input type="number" id="ord-qty" placeholder="SL" min="1" value="1" style="width: 80px;">
+                        <button type="button" class="btn-secondary" onclick="addOrderItem()">Thêm</button>
+                    </div>
+                    <ul id="ord-items-list" class="order-items-list">
+                        <!-- Added items go here -->
+                    </ul>
+                    
+                    <div class="form-group-row" style="margin-top: 15px;">
+                        <div class="form-group" style="flex:1">
+                            <label>Chi phí Ship (₫)</label>
+                            <input type="number" id="ord-shipping" value="0" min="0" onchange="renderOrderItems()">
+                        </div>
+                        <div class="form-group" style="flex:1; align-items:flex-end;">
+                            <label>Tổng thanh toán</label>
+                            <div class="order-total" id="ord-total-amount" style="margin-top: 5px;">0 ₫</div>
+                        </div>
+                    </div>
+                    
+                </div>
+
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>
+                        <input type="checkbox" id="ord-debt-check"> Khách ghi nợ (chưa thanh toán đủ)
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-primary w-full" style="margin-top: 15px;">Hoàn tất đơn</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Debt Modal -->
+    <div id="debt-modal" class="modal-overlay">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h2>Thêm công nợ</h2>
+                <button class="close-btn" onclick="closeModal('debt-modal')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="debt-form" onsubmit="handleDebtSubmit(event)">
+                <div class="form-group">
+                    <label>Loại nợ</label>
+                    <select id="debt-type">
+                        <option value="Khách nợ">Khách hàng nợ mình</option>
+                        <option value="Nợ NCC">Mình nợ Nhà cung cấp</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tên Khách hàng / Nhà cung cấp</label>
+                    <input type="text" id="debt-partner" required placeholder="VD: Gara Thành Đạt">
+                </div>
+                <div class="form-group">
+                    <label>Số tiền (₫)</label>
+                    <input type="number" id="debt-amount" required>
+                </div>
+                <div class="form-group">
+                    <label>Mô tả / Đơn hàng liên quan</label>
+                    <input type="text" id="debt-desc" required>
+                </div>
+                <button type="submit" class="btn-primary w-full">Ghi nhận công nợ</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Expense Modal -->
+    <div id="expense-modal" class="modal-overlay">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h2>Thêm khoản chi phí</h2>
+                <button class="close-btn" onclick="closeModal('expense-modal')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="expense-form" onsubmit="handleExpenseSubmit(event)">
+                <div class="form-group">
+                    <label>Loại chi phí</label>
+                    <select id="exp-type">
+                        <option value="Cố định">Chi phí cố định (Mặt bằng, lương...)</option>
+                        <option value="Phát sinh">Chi phí phát sinh (Điện, nước, sửa chữa...)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Mô tả chi tiết</label>
+                    <input type="text" id="exp-desc" required placeholder="VD: Tiền điện tháng 5">
+                </div>
+                <div class="form-group">
+                    <label>Số tiền (₫)</label>
+                    <input type="number" id="exp-amount" required>
+                </div>
+                <button type="submit" class="btn-primary w-full">Ghi nhận</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
