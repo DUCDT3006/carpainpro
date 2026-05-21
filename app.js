@@ -1,19 +1,67 @@
 // --- INITIALIZATION ---
 lucide.createIcons();
 
-const firebaseConfig = {
-    apiKey: "AIzaSyCIi5rpiOIFL1IGj7POL6gQ5uKh0kZSV8s",
-    authDomain: "carpaintpro-33c30.firebaseapp.com",
-    projectId: "carpaintpro-33c30",
-    storageBucket: "carpaintpro-33c30.firebasestorage.app",
-    messagingSenderId: "784738601103",
-    appId: "1:784738601103:web:ea9fc9c7358b5cdca1c8fa",
-    measurementId: "G-00Z8438E4C"
+// --- LOCAL STORAGE DATABASE MOCK (Thay thế Firebase) ---
+const db = {
+    collection: function(name) {
+        return {
+            onSnapshot: function(callback) {
+                const triggerCallback = () => {
+                    const data = JSON.parse(localStorage.getItem(name)) || [];
+                    const snapshot = {
+                        forEach: function(cb) {
+                            data.forEach(item => cb({ id: item.docId, data: () => item }));
+                        }
+                    };
+                    callback(snapshot);
+                };
+                triggerCallback(); // Initial load
+                window.addEventListener(name + 'Changed', triggerCallback);
+            },
+            add: async function(data) {
+                let items = JSON.parse(localStorage.getItem(name)) || [];
+                data.docId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                items.push(data);
+                localStorage.setItem(name, JSON.stringify(items));
+                window.dispatchEvent(new Event(name + 'Changed'));
+            },
+            doc: function(docId) {
+                return {
+                    update: async function(data) {
+                        let items = JSON.parse(localStorage.getItem(name)) || [];
+                        let index = items.findIndex(i => i.docId === docId);
+                        if(index !== -1) {
+                            items[index] = { ...items[index], ...data };
+                            localStorage.setItem(name, JSON.stringify(items));
+                            window.dispatchEvent(new Event(name + 'Changed'));
+                        }
+                    },
+                    delete: async function() {
+                        let items = JSON.parse(localStorage.getItem(name)) || [];
+                        items = items.filter(i => i.docId !== docId);
+                        localStorage.setItem(name, JSON.stringify(items));
+                        window.dispatchEvent(new Event(name + 'Changed'));
+                    }
+                };
+            },
+            where: function(field, op, value) {
+               return {
+                   get: async function() {
+                       let items = JSON.parse(localStorage.getItem(name)) || [];
+                       let filtered = items.filter(i => {
+                           if(op === '==') return i[field] === value;
+                           return false;
+                       });
+                       return {
+                           empty: filtered.length === 0,
+                           docs: filtered.map(i => ({ id: i.docId, data: () => i }))
+                       };
+                   }
+               };
+            }
+        };
+    }
 };
-
-// Khởi tạo Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
 
 // --- STATE MANAGEMENT ---
 let inventory = [];
@@ -339,9 +387,9 @@ window.handleInventorySubmit = async function(e) {
     };
 
     if(editingContext.docId) {
-        await db.collection('inventory').doc(editingContext.docId).update(data);
+        await db.collection('inventory').doc(editingContext.docId).update(data).catch(e => alert("Lỗi lưu dữ liệu lên Cloud: " + e.message));
     } else {
-        await db.collection('inventory').add(data);
+        await db.collection('inventory').add(data).catch(e => alert("Lỗi lưu dữ liệu lên Cloud: " + e.message));
     }
     
     closeModal('inventory-modal');
@@ -475,9 +523,10 @@ function updatePurchaseSelect() {
 }
 
 window.fillPurchasePrice = function() {
-    const code = document.getElementById('pur-product-select').value;
+    let code = document.getElementById('pur-product-select').value;
     const priceInput = document.getElementById('pur-item-price');
     if(!code) { priceInput.value = ''; return; }
+    code = code.toUpperCase().trim();
     const product = inventory.find(i => i.code === code);
     if(product) priceInput.value = product.inPrice;
 }
@@ -487,7 +536,7 @@ window.addPurchaseItem = function() {
     const priceInput = document.getElementById('pur-item-price');
     const qtyInput = document.getElementById('pur-qty');
     
-    const code = select.value;
+    const code = select.value.toUpperCase().trim();
     const price = parseInt(priceInput.value);
     const qty = parseInt(qtyInput.value);
 
@@ -636,16 +685,15 @@ function updateOrderSelect() {
     if(!dataList) return;
     dataList.innerHTML = '';
     inventory.forEach(item => {
-        if(item.qty > 0) {
-            dataList.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit} (Tồn: ${item.qty})</option>`;
-        }
+        dataList.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit} (Tồn: ${item.qty})</option>`;
     });
 }
 
 window.fillOrderPrice = function() {
-    const code = document.getElementById('ord-product-select').value;
+    let code = document.getElementById('ord-product-select').value;
     const priceInput = document.getElementById('ord-item-price');
     if(!code) { priceInput.value = ''; return; }
+    code = code.toUpperCase().trim();
     const product = inventory.find(i => i.code === code);
     if(product) priceInput.value = product.outPrice;
 }
@@ -655,7 +703,7 @@ window.addOrderItem = function() {
     const priceInput = document.getElementById('ord-item-price');
     const qtyInput = document.getElementById('ord-qty');
     
-    const code = select.value;
+    const code = select.value.toUpperCase().trim();
     const price = parseInt(priceInput.value);
     const qty = parseInt(qtyInput.value);
 
