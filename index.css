@@ -401,6 +401,7 @@ body.dark-theme {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-width: 0;
 }
 
 .form-group-row {
@@ -416,6 +417,7 @@ label {
 }
 
 input, select {
+    width: 100%;
     background: rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: white;
