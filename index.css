@@ -110,6 +110,26 @@ body.dark-theme {
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
+.btn-tab {
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    color: var(--text-muted);
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-weight: 500;
+}
+.btn-tab:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+}
+.btn-tab.active {
+    background: var(--primary);
+    color: var(--text-main);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
 .sidebar-footer {
     padding: 20px 24px 0;
     border-top: var(--glass-border);

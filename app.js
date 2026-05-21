@@ -21,6 +21,7 @@ let orders = [];
 let purchaseOrders = [];
 let expenses = [];
 let debts = [];
+let partners = [];
 
 let currentOrderItems = [];
 let currentPurchaseItems = [];
@@ -298,6 +299,14 @@ db.collection("debts").onSnapshot((snapshot) => {
     renderDashboard();
 });
 
+db.collection("partners").onSnapshot((snapshot) => {
+    partners = [];
+    snapshot.forEach(doc => partners.push({ docId: doc.id, ...doc.data() }));
+    renderPartners();
+    updateCustomerList();
+    updateSupplierList();
+});
+
 db.collection("expenses").onSnapshot((snapshot) => {
     expenses = [];
     snapshot.forEach(doc => expenses.push({ docId: doc.id, ...doc.data() }));
@@ -499,12 +508,11 @@ function updateSupplierList() {
     const list = document.getElementById('supplier-list');
     if(!list) return;
     let suppliers = new Set();
+    partners.filter(p => p.type === 'Nhà cung cấp').forEach(p => suppliers.add(p.name));
     inventory.forEach(i => { if(i.supplier) suppliers.add(i.supplier); });
     purchaseOrders.forEach(p => { if(p.supplier) suppliers.add(p.supplier); });
     list.innerHTML = '';
-    suppliers.forEach(s => {
-        list.innerHTML += `<option value="${s}">`;
-    });
+    suppliers.forEach(s => list.innerHTML += `<option value="${s}">`);
 }
 
 function updatePurchaseSelect() {
@@ -585,6 +593,9 @@ window.handlePurchaseSubmit = async function(e) {
     const totalAmount = currentPurchaseItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
     
     if(editingContext.docId) {
+        if(customId && purchaseOrders.find(o => o.id === customId && o.docId !== editingContext.docId)) {
+            return alert(`Mã đơn [${customId}] đã tồn tại! Vui lòng chọn mã khác.`);
+        }
         const oldOrder = editingContext.oldData;
         const data = { date, supplier, items: currentPurchaseItems, total: totalAmount };
         if(customId) data.id = customId;
@@ -609,6 +620,9 @@ window.handlePurchaseSubmit = async function(e) {
         await db.collection('purchaseOrders').doc(editingContext.docId).update(data);
     } else {
         if(!customId) customId = 'NH' + String(purchaseOrders.length + 1).padStart(3, '0');
+        if(purchaseOrders.find(o => o.id === customId)) {
+            return alert(`Mã đơn [${customId}] đã tồn tại! Vui lòng chọn mã khác.`);
+        }
         const newOrder = {
             id: customId, date: date, supplier: supplier, total: totalAmount,
             status: 'Đang chờ', items: currentPurchaseItems, timestamp: Date.now()
@@ -681,11 +695,10 @@ function updateCustomerList() {
     const list = document.getElementById('customer-list');
     if(!list) return;
     let customers = new Set();
+    partners.filter(p => p.type === 'Khách hàng').forEach(p => customers.add(p.name));
     orders.forEach(o => { if(o.customer) customers.add(o.customer); });
     list.innerHTML = '';
-    customers.forEach(c => {
-        list.innerHTML += `<option value="${c}">`;
-    });
+    customers.forEach(c => list.innerHTML += `<option value="${c}">`);
 }
 
 function updateOrderSelect() {
@@ -718,10 +731,16 @@ window.handleCustomerSelect = function() {
         document.getElementById('ord-id').value = 'DH' + prefix + String(count).padStart(2, '0');
     }
 
+    const partner = partners.find(p => p.name === customer && p.type === 'Khách hàng');
+    if(partner) {
+        if(partner.phone) document.getElementById('ord-phone').value = partner.phone;
+        if(partner.address) document.getElementById('ord-address').value = partner.address;
+    }
+
     const lastOrder = orders.slice().sort((a,b) => (b.timestamp||0) - (a.timestamp||0)).find(o => o.customer === customer);
     if(lastOrder) {
-        document.getElementById('ord-phone').value = lastOrder.phone || '';
-        document.getElementById('ord-address').value = lastOrder.address || '';
+        if(!partner && lastOrder.phone) document.getElementById('ord-phone').value = lastOrder.phone;
+        if(!partner && lastOrder.address) document.getElementById('ord-address').value = lastOrder.address;
         
         if(!editingContext.docId && currentOrderItems.length === 0) {
             if(confirm(`Khách hàng ${customer} đã từng mua hàng. Bạn có muốn tải lại danh sách mặt hàng họ đã mua lần gần nhất không?`)) {
@@ -822,6 +841,9 @@ window.handleOrderSubmit = async function(e) {
     const status = debtAmount > 0 ? 'Chưa thanh toán' : 'Hoàn thành';
     
     if(editingContext.docId) {
+        if(customId && orders.find(o => o.id === customId && o.docId !== editingContext.docId)) {
+            return alert(`Mã đơn [${customId}] đã tồn tại! Vui lòng chọn mã khác.`);
+        }
         const oldOrder = editingContext.oldData;
         const data = {
             deliveryDate, customer, phone, address, shipping, total: totalAmount, paid: paidAmount, status, items: currentOrderItems
@@ -864,6 +886,9 @@ window.handleOrderSubmit = async function(e) {
         }
     } else {
         if(!customId) customId = 'DH' + String(orders.length + 1).padStart(3, '0');
+        if(orders.find(o => o.id === customId)) {
+            return alert(`Mã đơn [${customId}] đã tồn tại! Vui lòng chọn mã khác.`);
+        }
         const newOrder = {
             id: customId, date: getTodayDate(), deliveryDate, customer, phone, address, shipping,
             total: totalAmount, paid: paidAmount, status, items: currentOrderItems, timestamp: Date.now()
@@ -896,8 +921,12 @@ window.handleOrderSubmit = async function(e) {
 
 
 // --- MODAL UTILS ---
-window.openModal = function(id) {
+window.openModal = function(id, arg) {
     document.getElementById(id).classList.add('active');
+    if(id === 'partner-modal' && arg) {
+        document.getElementById('partner-modal-title').textContent = `Thêm ${arg}`;
+        document.getElementById('partner-type').value = arg;
+    }
 }
 window.closeModal = function(id) {
     document.getElementById(id).classList.remove('active');
@@ -912,3 +941,57 @@ document.querySelectorAll('.modal-overlay').forEach(modal => {
     //     }
     // });
 });
+
+// --- PARTNERS LOGIC ---
+window.switchPartnerTab = function(tab) {
+    document.querySelectorAll('.btn-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.partner-view').forEach(v => v.style.display = 'none');
+    
+    document.getElementById(`tab-${tab}`).classList.add('active');
+    document.getElementById(`view-${tab}`).style.display = 'block';
+}
+
+function renderPartners() {
+    const customersTbody = document.getElementById('customers-tbody');
+    const suppliersTbody = document.getElementById('suppliers-tbody');
+    if(!customersTbody || !suppliersTbody) return;
+    
+    customersTbody.innerHTML = '';
+    suppliersTbody.innerHTML = '';
+    
+    partners.forEach(partner => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="font-semibold">${partner.name}</td>
+            <td>${partner.phone || ''}</td>
+            <td>${partner.address || ''}</td>
+            <td>
+                <button class="btn-icon delete" onclick="deleteItem('partners', '${partner.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
+            </td>
+        `;
+        if(partner.type === 'Khách hàng') customersTbody.appendChild(tr);
+        else suppliersTbody.appendChild(tr);
+    });
+    lucide.createIcons();
+}
+
+window.handlePartnerSubmit = async function(e) {
+    e.preventDefault();
+    const type = document.getElementById('partner-type').value;
+    const name = document.getElementById('partner-name').value.trim();
+    if(!name) return;
+    
+    const data = {
+        type, name,
+        phone: document.getElementById('partner-phone').value,
+        address: document.getElementById('partner-address').value,
+        timestamp: Date.now()
+    };
+    
+    if(partners.find(p => p.type === type && p.name.toUpperCase() === name.toUpperCase())) {
+        if(!confirm(`Đối tác ${name} đã tồn tại trong danh bạ. Vẫn tiếp tục tạo mới?`)) return;
+    }
+    
+    await db.collection('partners').add(data);
+    closeModal('partner-modal');
+}

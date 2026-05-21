@@ -27,8 +27,8 @@
                 <button class="nav-item" data-target="inventory">
                     <i data-lucide="package"></i> Quản lý Kho
                 </button>
-                <button class="nav-item" data-target="purchase">
-                    <i data-lucide="truck"></i> Đặt hàng NCC
+                <button class="nav-item" data-target="partners">
+                    <i data-lucide="users"></i> Khách hàng - NCC
                 </button>
                 <button class="nav-item" data-target="orders">
                     <i data-lucide="shopping-cart"></i> Đơn Bán Hàng
@@ -134,30 +134,86 @@
                     </div>
                 </section>
 
-                <!-- Purchase Orders Section -->
-                <section id="purchase" class="page-section">
+                <!-- Partners Section -->
+                <section id="partners" class="page-section">
                     <div class="section-header">
-                        <h2>Danh sách Đặt hàng NCC</h2>
-                        <button class="btn-primary" onclick="openModal('purchase-modal')">
-                            <i data-lucide="plus"></i> Tạo đơn nhập hàng
-                        </button>
+                        <h2>Quản lý Đối tác</h2>
+                        <div>
+                            <button class="btn-primary" onclick="openModal('partner-modal', 'Khách hàng')">
+                                <i data-lucide="plus"></i> Thêm Khách hàng
+                            </button>
+                            <button class="btn-secondary" onclick="openModal('partner-modal', 'Nhà cung cấp')">
+                                <i data-lucide="plus"></i> Thêm NCC
+                            </button>
+                        </div>
                     </div>
-                    <div class="table-container glass">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Mã đơn</th>
-                                    <th>Ngày đặt</th>
-                                    <th>Nhà cung cấp</th>
-                                    <th>Tổng tiền</th>
-                                    <th>Trạng thái (Click đổi)</th>
-                                    <th>Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody id="purchase-tbody">
-                                <!-- JS injected -->
-                            </tbody>
-                        </table>
+                    
+                    <div class="tabs-container" style="display:flex; gap:10px; margin-bottom:20px;">
+                        <button id="tab-customers" class="btn-tab active" onclick="switchPartnerTab('customers')">Khách hàng</button>
+                        <button id="tab-suppliers" class="btn-tab" onclick="switchPartnerTab('suppliers')">Nhà cung cấp</button>
+                    </div>
+
+                    <!-- Customers View -->
+                    <div id="view-customers" class="partner-view">
+                        <div class="table-container glass">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tên Khách hàng</th>
+                                        <th>Số điện thoại</th>
+                                        <th>Địa chỉ</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="customers-tbody">
+                                    <!-- JS injected -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Suppliers View -->
+                    <div id="view-suppliers" class="partner-view" style="display:none">
+                        <div class="table-container glass" style="margin-bottom: 30px;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tên Nhà cung cấp</th>
+                                        <th>Số điện thoại</th>
+                                        <th>Địa chỉ</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="suppliers-tbody">
+                                    <!-- JS injected -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Purchase Orders Sub-section -->
+                        <div class="section-header">
+                            <h2>Đơn Đặt Hàng NCC</h2>
+                            <button class="btn-primary" onclick="openModal('purchase-modal')">
+                                <i data-lucide="plus"></i> Tạo đơn nhập hàng
+                            </button>
+                        </div>
+                        <div class="table-container glass">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Mã đơn</th>
+                                        <th>Ngày đặt</th>
+                                        <th>Nhà cung cấp</th>
+                                        <th>Tổng tiền</th>
+                                        <th>Trạng thái</th>
+                                        <th>Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="purchase-tbody">
+                                    <!-- JS injected -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 
@@ -246,6 +302,31 @@
     </div>
 
     <!-- Modals -->
+    <!-- Partner Modal (Khách hàng/NCC) -->
+    <div id="partner-modal" class="modal-overlay">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h2 id="partner-modal-title">Thêm Khách hàng</h2>
+                <button class="close-btn" onclick="closeModal('partner-modal')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="partner-form" onsubmit="handlePartnerSubmit(event)">
+                <input type="hidden" id="partner-type" value="Khách hàng">
+                <div class="form-group">
+                    <label>Tên Khách hàng / NCC</label>
+                    <input type="text" id="partner-name" required placeholder="VD: Gara Thành Đạt">
+                </div>
+                <div class="form-group">
+                    <label>Số điện thoại</label>
+                    <input type="text" id="partner-phone" placeholder="09xxxxxxx">
+                </div>
+                <div class="form-group">
+                    <label>Địa chỉ</label>
+                    <input type="text" id="partner-address" placeholder="123 Đường A...">
+                </div>
+                <button type="submit" class="btn-primary w-full" id="partner-submit-btn">Lưu Đối tác</button>
+            </form>
+        </div>
+    </div>
     <!-- Inventory Modal -->
     <div id="inventory-modal" class="modal-overlay">
         <div class="modal-content glass-modal">
