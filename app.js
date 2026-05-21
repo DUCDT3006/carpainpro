@@ -512,7 +512,7 @@ function updatePurchaseSelect() {
     if(!dataList) return;
     dataList.innerHTML = '';
     inventory.forEach(item => {
-        dataList.innerHTML += `<option value="${item.code}">${item.code} - ${item.name || ''} (${item.unit})</option>`;
+        dataList.innerHTML += `<option value="${item.code} - ${item.name || ''}">Tồn kho: ${item.qty} ${item.unit}</option>`;
     });
 }
 
@@ -693,7 +693,7 @@ function updateOrderSelect() {
     if(!dataList) return;
     dataList.innerHTML = '';
     inventory.forEach(item => {
-        dataList.innerHTML += `<option value="${item.code}">${item.code} - ${item.name || ''} (Tồn: ${item.qty})</option>`;
+        dataList.innerHTML += `<option value="${item.code} - ${item.name || ''}">Tồn kho: ${item.qty} ${item.unit}</option>`;
     });
 }
 
