@@ -25,6 +25,13 @@ let debts = [];
 let currentOrderItems = [];
 let currentPurchaseItems = [];
 
+// Trạng thái khi ấn nút Sửa
+let editingContext = {
+    collection: null,
+    docId: null,
+    oldData: null
+};
+
 // --- FORMATTING UTILS ---
 const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -62,9 +69,9 @@ navItems.forEach(item => {
     });
 });
 
-// --- GLOBAL DELETE FUNCTION ---
+// --- GLOBAL ACTIONS ---
 window.deleteItem = async function(collection, docId) {
-    if(confirm('Bạn có chắc chắn muốn xóa bản ghi này?')) {
+    if(confirm('Bạn có chắc chắn muốn xóa bản ghi này? LƯU Ý: Xóa sẽ KHÔNG tự động hoàn lại Tồn kho hay Công nợ!')) {
         try {
             await db.collection(collection).doc(docId).delete();
         } catch (e) {
@@ -74,11 +81,126 @@ window.deleteItem = async function(collection, docId) {
     }
 }
 
+window.openEditModal = function(collection, docId) {
+    editingContext.collection = collection;
+    editingContext.docId = docId;
+    
+    if(collection === 'inventory') {
+        const item = inventory.find(i => i.docId === docId);
+        editingContext.oldData = item;
+        document.getElementById('inv-code').value = item.code;
+        document.getElementById('inv-unit').value = item.unit;
+        document.getElementById('inv-qty').value = item.qty;
+        document.getElementById('inv-in-price').value = item.inPrice;
+        document.getElementById('inv-out-price').value = item.outPrice;
+        document.getElementById('inv-supplier').value = item.supplier;
+        
+        document.getElementById('inventory-modal').querySelector('h2').textContent = 'Sửa vật tư';
+        document.getElementById('inventory-form').querySelector('button[type="submit"]').textContent = 'Cập nhật';
+        openModal('inventory-modal');
+    }
+    else if(collection === 'expenses') {
+        const item = expenses.find(i => i.docId === docId);
+        editingContext.oldData = item;
+        document.getElementById('exp-type').value = item.type;
+        document.getElementById('exp-desc').value = item.desc;
+        document.getElementById('exp-amount').value = item.amount;
+        
+        document.getElementById('expense-modal').querySelector('h2').textContent = 'Sửa chi phí';
+        document.getElementById('expense-form').querySelector('button[type="submit"]').textContent = 'Cập nhật';
+        openModal('expense-modal');
+    }
+    else if(collection === 'debts') {
+        const item = debts.find(i => i.docId === docId);
+        editingContext.oldData = item;
+        document.getElementById('debt-type').value = item.type;
+        document.getElementById('debt-partner').value = item.partner;
+        document.getElementById('debt-amount').value = item.amount;
+        document.getElementById('debt-desc').value = item.desc;
+        
+        document.getElementById('debt-modal').querySelector('h2').textContent = 'Sửa công nợ';
+        document.getElementById('debt-form').querySelector('button[type="submit"]').textContent = 'Cập nhật';
+        openModal('debt-modal');
+    }
+    else if(collection === 'orders') {
+        const item = orders.find(i => i.docId === docId);
+        editingContext.oldData = item;
+        
+        document.getElementById('ord-id').value = item.id;
+        document.getElementById('ord-customer').value = item.customer;
+        document.getElementById('ord-date').value = item.deliveryDate;
+        document.getElementById('ord-phone').value = item.phone || '';
+        document.getElementById('ord-address').value = item.address || '';
+        document.getElementById('ord-shipping').value = item.shipping || 0;
+        document.getElementById('ord-debt-check').checked = item.status === 'Chưa thanh toán';
+        
+        currentOrderItems = JSON.parse(JSON.stringify(item.items || []));
+        renderOrderItems();
+        
+        document.getElementById('order-modal').querySelector('h2').textContent = 'Sửa Đơn Bán Hàng';
+        document.getElementById('order-form').querySelector('button[type="submit"]').textContent = 'Cập nhật Đơn hàng';
+        openModal('order-modal');
+    }
+    else if(collection === 'purchaseOrders') {
+        const item = purchaseOrders.find(i => i.docId === docId);
+        editingContext.oldData = item;
+        
+        document.getElementById('pur-id').value = item.id;
+        document.getElementById('pur-supplier').value = item.supplier;
+        document.getElementById('pur-date').value = item.date;
+        
+        currentPurchaseItems = JSON.parse(JSON.stringify(item.items || []));
+        renderPurchaseItems();
+        
+        document.getElementById('purchase-modal').querySelector('h2').textContent = 'Sửa Đơn Nhập Hàng';
+        document.getElementById('purchase-form').querySelector('button[type="submit"]').textContent = 'Cập nhật Đơn hàng';
+        openModal('purchase-modal');
+    }
+}
+
+// Reset form UI on close
+window.resetFormUI = function(modalId) {
+    editingContext = { collection: null, docId: null, oldData: null };
+    const modal = document.getElementById(modalId);
+    
+    if(modalId === 'inventory-modal') {
+        modal.querySelector('h2').textContent = 'Khai báo vật tư mới';
+        modal.querySelector('button[type="submit"]').textContent = 'Lưu vật tư';
+        document.getElementById('inventory-form').reset();
+    }
+    else if(modalId === 'expense-modal') {
+        modal.querySelector('h2').textContent = 'Thêm khoản chi phí';
+        modal.querySelector('button[type="submit"]').textContent = 'Ghi nhận';
+        document.getElementById('expense-form').reset();
+    }
+    else if(modalId === 'debt-modal') {
+        modal.querySelector('h2').textContent = 'Thêm công nợ';
+        modal.querySelector('button[type="submit"]').textContent = 'Ghi nhận công nợ';
+        document.getElementById('debt-form').reset();
+    }
+    else if(modalId === 'order-modal') {
+        modal.querySelector('h2').textContent = 'Tạo đơn bán hàng';
+        modal.querySelector('button[type="submit"]').textContent = 'Lưu đơn bán hàng';
+        document.getElementById('order-form').reset();
+        currentOrderItems = [];
+        renderOrderItems();
+        document.getElementById('ord-date').value = getTodayDateISO();
+    }
+    else if(modalId === 'purchase-modal') {
+        modal.querySelector('h2').textContent = 'Tạo Đơn Đặt Hàng NCC';
+        modal.querySelector('button[type="submit"]').textContent = 'Lưu đơn đặt hàng';
+        document.getElementById('purchase-form').reset();
+        currentPurchaseItems = [];
+        renderPurchaseItems();
+        document.getElementById('pur-date').value = getTodayDateISO();
+    }
+}
+
+
 // --- DASHBOARD LOGIC ---
 function renderDashboard() {
     let totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
     
-    // Inventory cost based on current items
     let inventoryCost = inventory.reduce((sum, item) => sum + (item.qty * item.inPrice), 0);
     let totalExpense = expenses.reduce((sum, exp) => sum + exp.amount, 0);
     let totalCost = inventoryCost + totalExpense;
@@ -195,6 +317,7 @@ function renderInventory() {
             <td>${formatCurrency(item.outPrice)}</td>
             <td>${item.supplier}</td>
             <td>
+                <button class="btn-icon" style="color:var(--info)" onclick="openEditModal('inventory', '${item.docId}')"><i data-lucide="edit-2" style="width:18px"></i></button>
                 <button class="btn-icon delete" onclick="deleteItem('inventory', '${item.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
             </td>
         `;
@@ -203,9 +326,9 @@ function renderInventory() {
     lucide.createIcons();
 }
 
-window.handleInventorySubmit = function(e) {
+window.handleInventorySubmit = async function(e) {
     e.preventDefault();
-    const newItem = {
+    const data = {
         code: document.getElementById('inv-code').value.toUpperCase(),
         unit: document.getElementById('inv-unit').value.toUpperCase(),
         qty: parseInt(document.getElementById('inv-qty').value) || 0,
@@ -215,24 +338,116 @@ window.handleInventorySubmit = function(e) {
         timestamp: Date.now()
     };
 
-    db.collection('inventory').add(newItem);
+    if(editingContext.docId) {
+        await db.collection('inventory').doc(editingContext.docId).update(data);
+    } else {
+        await db.collection('inventory').add(data);
+    }
+    
     closeModal('inventory-modal');
-    e.target.reset();
 }
 
-// --- PURCHASE ORDERS (ĐẶT HÀNG NCC) LOGIC ---
+
+// --- EXPENSES LOGIC ---
+function renderExpenses() {
+    const tbody = document.getElementById('expenses-tbody');
+    tbody.innerHTML = '';
+    expenses.forEach(exp => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${exp.date}</td>
+            <td><span class="badge ${exp.type === 'Cố định' ? 'warning' : 'info'}">${exp.type}</span></td>
+            <td>${exp.desc}</td>
+            <td class="text-danger font-semibold">${formatCurrency(exp.amount)}</td>
+            <td>
+                <button class="btn-icon" style="color:var(--info)" onclick="openEditModal('expenses', '${exp.docId}')"><i data-lucide="edit-2" style="width:18px"></i></button>
+                <button class="btn-icon delete" onclick="deleteItem('expenses', '${exp.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    lucide.createIcons();
+}
+
+window.handleExpenseSubmit = async function(e) {
+    e.preventDefault();
+    const data = {
+        date: getTodayDate(),
+        type: document.getElementById('exp-type').value,
+        desc: document.getElementById('exp-desc').value,
+        amount: parseInt(document.getElementById('exp-amount').value),
+        timestamp: Date.now()
+    };
+
+    if(editingContext.docId) {
+        await db.collection('expenses').doc(editingContext.docId).update(data);
+    } else {
+        await db.collection('expenses').add(data);
+    }
+    closeModal('expense-modal');
+}
+
+// --- DEBTS LOGIC ---
+function renderDebts() {
+    const tbody = document.getElementById('debts-tbody');
+    tbody.innerHTML = '';
+    debts.forEach(debt => {
+        const tr = document.createElement('tr');
+        const typeBadgeColor = debt.type === 'Khách nợ' ? 'info' : 'warning';
+        const statusBadgeColor = debt.status === 'Chưa thanh toán' ? 'danger' : 'success';
+        tr.innerHTML = `
+            <td class="font-semibold">${debt.id}</td>
+            <td>${debt.date}</td>
+            <td>${debt.partner}</td>
+            <td><span class="badge ${typeBadgeColor}">${debt.type}</span></td>
+            <td class="text-danger font-semibold">${formatCurrency(debt.amount)}</td>
+            <td><span class="badge ${statusBadgeColor} clickable" onclick="toggleDebtStatus('${debt.docId}', '${debt.status}')">${debt.status}</span></td>
+            <td>
+                <button class="btn-icon" style="color:var(--info)" onclick="openEditModal('debts', '${debt.docId}')"><i data-lucide="edit-2" style="width:18px"></i></button>
+                <button class="btn-icon delete" onclick="deleteItem('debts', '${debt.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    lucide.createIcons();
+}
+
+window.toggleDebtStatus = async function(docId, currentStatus) {
+    const newStatus = currentStatus === 'Chưa thanh toán' ? 'Đã thanh toán' : 'Chưa thanh toán';
+    await db.collection('debts').doc(docId).update({ status: newStatus });
+}
+
+window.handleDebtSubmit = async function(e) {
+    e.preventDefault();
+    const data = {
+        date: getTodayDate(),
+        partner: document.getElementById('debt-partner').value,
+        type: document.getElementById('debt-type').value,
+        amount: parseInt(document.getElementById('debt-amount').value),
+        desc: document.getElementById('debt-desc').value,
+        timestamp: Date.now()
+    };
+    
+    if(!editingContext.docId) {
+        data.id = 'CN' + String(debts.length + 1).padStart(3, '0');
+        data.status = 'Chưa thanh toán';
+        await db.collection('debts').add(data);
+    } else {
+        await db.collection('debts').doc(editingContext.docId).update(data);
+    }
+    closeModal('debt-modal');
+}
+
+
+// --- PURCHASE ORDERS LOGIC ---
 function renderPurchaseOrders() {
     const tbody = document.getElementById('purchase-tbody');
     tbody.innerHTML = '';
-    
     purchaseOrders.forEach(order => {
         const tr = document.createElement('tr');
-        let statusBadge = '';
-        if(order.status === 'Đang chờ') {
-            statusBadge = `<span class="badge warning clickable" onclick="togglePurchaseStatus('${order.docId}', '${order.status}', '${escape(JSON.stringify(order))}')">Đang chờ (Click để Nhận)</span>`;
-        } else {
-            statusBadge = `<span class="badge success">Đã nhận hàng</span>`;
-        }
+        let statusBadge = order.status === 'Đang chờ' 
+            ? `<span class="badge warning clickable" onclick="togglePurchaseStatus('${order.docId}', '${order.status}', '${escape(JSON.stringify(order))}')">Đang chờ (Click để Nhận)</span>` 
+            : `<span class="badge success">Đã nhận hàng</span>`;
 
         tr.innerHTML = `
             <td class="font-semibold">${order.id}</td>
@@ -241,6 +456,7 @@ function renderPurchaseOrders() {
             <td class="text-danger font-semibold">${formatCurrency(order.total)}</td>
             <td>${statusBadge}</td>
             <td>
+                <button class="btn-icon" style="color:var(--info)" onclick="openEditModal('purchaseOrders', '${order.docId}')"><i data-lucide="edit-2" style="width:18px"></i></button>
                 <button class="btn-icon delete" onclick="deleteItem('purchaseOrders', '${order.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
             </td>
         `;
@@ -281,37 +497,25 @@ window.addPurchaseItem = function() {
     const existingItem = currentPurchaseItems.find(i => i.code === code);
     if(existingItem) {
         existingItem.qty += qty;
-        existingItem.price = price; // Update to latest price
+        existingItem.price = price;
     } else {
-        currentPurchaseItems.push({
-            code: product.code,
-            name: `${product.code} - ${product.unit}`,
-            price: price,
-            qty: qty
-        });
+        currentPurchaseItems.push({ code: product.code, name: `${product.code} - ${product.unit}`, price: price, qty: qty });
     }
-
     renderPurchaseItems();
-    qtyInput.value = 1;
-    select.value = "";
-    priceInput.value = "";
+    qtyInput.value = 1; select.value = ""; priceInput.value = "";
 }
 
 window.renderPurchaseItems = function() {
     const list = document.getElementById('pur-items-list');
     list.innerHTML = '';
     let total = 0;
-
     currentPurchaseItems.forEach((item, index) => {
         total += item.price * item.qty;
         const li = document.createElement('li');
         li.className = 'order-item';
         li.innerHTML = `
             <div>${item.name} <span class="text-muted">x${item.qty} (${formatCurrency(item.price)})</span></div>
-            <div>
-                ${formatCurrency(item.price * item.qty)}
-                <i data-lucide="trash-2" style="cursor:pointer; color:var(--danger); width:16px; margin-left:10px" onclick="removePurchaseItem(${index})"></i>
-            </div>
+            <div>${formatCurrency(item.price * item.qty)} <i data-lucide="trash-2" style="cursor:pointer; color:var(--danger); width:16px; margin-left:10px" onclick="removePurchaseItem(${index})"></i></div>
         `;
         list.appendChild(li);
     });
@@ -330,26 +534,41 @@ window.handlePurchaseSubmit = async function(e) {
 
     const supplier = document.getElementById('pur-supplier').value;
     const date = document.getElementById('pur-date').value;
+    let customId = document.getElementById('pur-id').value;
     const totalAmount = currentPurchaseItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
     
-    const newId = 'NH' + String(purchaseOrders.length + 1).padStart(3, '0');
+    if(editingContext.docId) {
+        const oldOrder = editingContext.oldData;
+        const data = { date, supplier, items: currentPurchaseItems, total: totalAmount };
+        if(customId) data.id = customId;
+        
+        // AUTO-DIFF INVENTORY logic if it was already received
+        if(oldOrder.status === 'Đã nhận hàng') {
+            const oldItems = oldOrder.items || [];
+            // Revert old items
+            for(let oldItem of oldItems) {
+                let invItem = inventory.find(i => i.code === oldItem.code);
+                if(invItem) await db.collection('inventory').doc(invItem.docId).update({ qty: invItem.qty - oldItem.qty });
+            }
+            // Apply new items (refetch inventory in real scenario, but simplified here)
+            for(let newItem of currentPurchaseItems) {
+                let invDoc = await db.collection('inventory').where('code', '==', newItem.code).get();
+                if(!invDoc.empty) {
+                    let idoc = invDoc.docs[0];
+                    await db.collection('inventory').doc(idoc.id).update({ qty: idoc.data().qty + newItem.qty });
+                }
+            }
+        }
+        await db.collection('purchaseOrders').doc(editingContext.docId).update(data);
+    } else {
+        if(!customId) customId = 'NH' + String(purchaseOrders.length + 1).padStart(3, '0');
+        const newOrder = {
+            id: customId, date: date, supplier: supplier, total: totalAmount,
+            status: 'Đang chờ', items: currentPurchaseItems, timestamp: Date.now()
+        };
+        await db.collection('purchaseOrders').add(newOrder);
+    }
     
-    const newOrder = {
-        id: newId,
-        date: date,
-        supplier: supplier,
-        total: totalAmount,
-        status: 'Đang chờ', // Chưa cộng kho
-        items: currentPurchaseItems,
-        timestamp: Date.now()
-    };
-
-    await db.collection('purchaseOrders').add(newOrder);
-    
-    currentPurchaseItems = [];
-    e.target.reset();
-    document.getElementById('pur-date').value = getTodayDateISO();
-    renderPurchaseItems();
     closeModal('purchase-modal');
 }
 
@@ -357,32 +576,23 @@ window.togglePurchaseStatus = async function(docId, currentStatus, orderJsonStr)
     if(currentStatus === 'Đang chờ') {
         if(confirm('Xác nhận đã nhận hàng? (Hệ thống sẽ tự động cộng số lượng vào Kho và Ghi nhận Công nợ)')) {
             const orderData = JSON.parse(unescape(orderJsonStr));
-            
-            // 1. Cập nhật trạng thái
             await db.collection('purchaseOrders').doc(docId).update({ status: 'Đã nhận hàng' });
             
-            // 2. Cộng tồn kho
             orderData.items.forEach(async (orderItem) => {
                 let invItem = inventory.find(i => i.code === orderItem.code);
                 if(invItem) {
-                    await db.collection('inventory').doc(invItem.docId).update({
-                        qty: invItem.qty + orderItem.qty
-                    });
+                    await db.collection('inventory').doc(invItem.docId).update({ qty: invItem.qty + orderItem.qty });
                 }
             });
 
-            // 3. Tạo công nợ NCC
             await db.collection('debts').add({
                 id: 'CN' + String(debts.length + 1).padStart(3, '0'),
                 date: getTodayDate(),
                 partner: orderData.supplier,
-                type: 'Nợ NCC',
-                amount: orderData.total,
+                type: 'Nợ NCC', amount: orderData.total,
                 desc: `Nhập hàng đơn ${orderData.id}`,
-                status: 'Chưa thanh toán',
-                timestamp: Date.now()
+                status: 'Chưa thanh toán', timestamp: Date.now()
             });
-
             alert('Đã nhận hàng và cập nhật hệ thống thành công!');
         }
     }
@@ -393,12 +603,9 @@ window.togglePurchaseStatus = async function(docId, currentStatus, orderJsonStr)
 function renderOrders() {
     const tbody = document.getElementById('orders-tbody');
     tbody.innerHTML = '';
-    
     orders.forEach(order => {
         const tr = document.createElement('tr');
-        
         let statusBadge = `<span class="badge ${order.status === 'Hoàn thành' ? 'success' : 'warning'} clickable" onclick="toggleOrderStatus('${order.docId}', '${order.status}')">${order.status}</span>`;
-
         tr.innerHTML = `
             <td class="font-semibold">${order.id}</td>
             <td>${order.deliveryDate}</td>
@@ -409,6 +616,7 @@ function renderOrders() {
             <td class="text-success font-semibold">${formatCurrency(order.total)}</td>
             <td>${statusBadge}</td>
             <td>
+                <button class="btn-icon" style="color:var(--info)" onclick="openEditModal('orders', '${order.docId}')"><i data-lucide="edit-2" style="width:18px"></i></button>
                 <button class="btn-icon delete" onclick="deleteItem('orders', '${order.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
             </td>
         `;
@@ -458,28 +666,43 @@ window.addOrderItem = function() {
     if(existingItem) {
         if(existingItem.qty + qty > product.qty) return alert('Tổng số lượng vượt tồn kho');
         existingItem.qty += qty;
-        existingItem.price = price; // Update to latest selected price
+        existingItem.price = price; 
     } else {
-        currentOrderItems.push({
-            code: product.code,
-            name: `${product.code} - ${product.unit}`,
-            price: price,
-            qty: qty
-        });
+        currentOrderItems.push({ code: product.code, name: `${product.code} - ${product.unit}`, price: price, qty: qty });
     }
-
     renderOrderItems();
-    qtyInput.value = 1;
-    select.value = "";
-    priceInput.value = "";
+    qtyInput.value = 1; select.value = ""; priceInput.value = "";
 }
 
-// Reuse order items rendering from before
-// We just mapped renderOrderItems globally above
+window.renderOrderItems = function() {
+    const list = document.getElementById('ord-items-list');
+    list.innerHTML = '';
+    let productTotal = 0;
+    currentOrderItems.forEach((item, index) => {
+        productTotal += item.price * item.qty;
+        const li = document.createElement('li');
+        li.className = 'order-item';
+        li.innerHTML = `
+            <div>${item.name} <span class="text-muted">x${item.qty} (${formatCurrency(item.price)})</span></div>
+            <div>${formatCurrency(item.price * item.qty)} <i data-lucide="trash-2" style="cursor:pointer; color:var(--danger); width:16px; margin-left:10px" onclick="removeOrderItem(${index})"></i></div>
+        `;
+        list.appendChild(li);
+    });
+    lucide.createIcons();
+    const shippingCost = parseInt(document.getElementById('ord-shipping').value) || 0;
+    document.getElementById('ord-total-amount').textContent = formatCurrency(productTotal + shippingCost);
+}
+
+window.removeOrderItem = function(index) {
+    currentOrderItems.splice(index, 1);
+    renderOrderItems();
+}
+
 window.handleOrderSubmit = async function(e) {
     e.preventDefault();
     if(currentOrderItems.length === 0) return alert('Vui lòng thêm ít nhất 1 sản phẩm');
 
+    let customId = document.getElementById('ord-id').value;
     const customer = document.getElementById('ord-customer').value;
     const phone = document.getElementById('ord-phone').value;
     const address = document.getElementById('ord-address').value;
@@ -489,142 +712,62 @@ window.handleOrderSubmit = async function(e) {
     
     const productTotal = currentOrderItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
     const totalAmount = productTotal + shipping;
+    const status = isDebt ? 'Chưa thanh toán' : 'Hoàn thành';
     
-    // Deduct inventory in Firebase
-    currentOrderItems.forEach(async (orderItem) => {
-        let invItem = inventory.find(i => i.code === orderItem.code);
-        if(invItem) {
-            await db.collection('inventory').doc(invItem.docId).update({
-                qty: invItem.qty - orderItem.qty
+    if(editingContext.docId) {
+        const oldOrder = editingContext.oldData;
+        const data = {
+            deliveryDate, customer, phone, address, shipping, total: totalAmount, status, items: currentOrderItems
+        };
+        if(customId) data.id = customId;
+
+        // Auto-diff inventory logic
+        const oldItems = oldOrder.items || [];
+        // Revert old items
+        for(let oldItem of oldItems) {
+            let invItem = inventory.find(i => i.code === oldItem.code);
+            if(invItem) await db.collection('inventory').doc(invItem.docId).update({ qty: invItem.qty + oldItem.qty });
+        }
+        // Apply new items
+        for(let newItem of currentOrderItems) {
+            let invDoc = await db.collection('inventory').where('code', '==', newItem.code).get();
+            if(!invDoc.empty) {
+                let idoc = invDoc.docs[0];
+                await db.collection('inventory').doc(idoc.id).update({ qty: idoc.data().qty - newItem.qty });
+            }
+        }
+        
+        await db.collection('orders').doc(editingContext.docId).update(data);
+    } else {
+        if(!customId) customId = 'DH' + String(orders.length + 1).padStart(3, '0');
+        const newOrder = {
+            id: customId, date: getTodayDate(), deliveryDate, customer, phone, address, shipping,
+            total: totalAmount, status, items: currentOrderItems, timestamp: Date.now()
+        };
+        
+        currentOrderItems.forEach(async (orderItem) => {
+            let invItem = inventory.find(i => i.code === orderItem.code);
+            if(invItem) {
+                await db.collection('inventory').doc(invItem.docId).update({ qty: invItem.qty - orderItem.qty });
+            }
+        });
+
+        await db.collection('orders').add(newOrder);
+        
+        if(isDebt) {
+            await db.collection('debts').add({
+                id: 'CN' + String(debts.length + 1).padStart(3, '0'),
+                date: getTodayDate(), partner: customer, type: 'Khách nợ', amount: totalAmount,
+                desc: `Đơn hàng ${customId}`, status: 'Chưa thanh toán', timestamp: Date.now()
             });
         }
-    });
-
-    const newOrderId = 'DH' + String(orders.length + 1).padStart(3, '0');
-    
-    const newOrder = {
-        id: newOrderId,
-        date: getTodayDate(),
-        deliveryDate: deliveryDate,
-        customer: customer,
-        phone: phone,
-        address: address,
-        shipping: shipping,
-        total: totalAmount,
-        status: isDebt ? 'Chưa thanh toán' : 'Hoàn thành',
-        timestamp: Date.now()
-    };
-
-    await db.collection('orders').add(newOrder);
-    
-    if(isDebt) {
-        await db.collection('debts').add({
-            id: 'CN' + String(debts.length + 1).padStart(3, '0'),
-            date: getTodayDate(),
-            partner: customer,
-            type: 'Khách nợ',
-            amount: totalAmount,
-            desc: `Đơn hàng ${newOrderId}`,
-            status: 'Chưa thanh toán',
-            timestamp: Date.now()
-        });
     }
     
-    currentOrderItems = [];
-    e.target.reset();
-    document.getElementById('ord-date').value = getTodayDateISO();
-    renderOrderItems();
     closeModal('order-modal');
     
+    // Check low stock
     const lowStockAlerts = inventory.filter(i => (i.qty - currentOrderItems.filter(ci=>ci.code===i.code).reduce((s,c)=>s+c.qty,0)) <= 3);
-    if(lowStockAlerts.length > 0) alert('Lên đơn hàng thành công!\n⚠️ Lưu ý: Một số mặt hàng sắp hết kho, vui lòng kiểm tra!');
-}
-
-
-// --- DEBTS LOGIC ---
-function renderDebts() {
-    const tbody = document.getElementById('debts-tbody');
-    tbody.innerHTML = '';
-    
-    debts.forEach(debt => {
-        const tr = document.createElement('tr');
-        const typeBadgeColor = debt.type === 'Khách nợ' ? 'info' : 'warning';
-        const statusBadgeColor = debt.status === 'Chưa thanh toán' ? 'danger' : 'success';
-        
-        tr.innerHTML = `
-            <td class="font-semibold">${debt.id}</td>
-            <td>${debt.date}</td>
-            <td>${debt.partner}</td>
-            <td><span class="badge ${typeBadgeColor}">${debt.type}</span></td>
-            <td class="text-danger font-semibold">${formatCurrency(debt.amount)}</td>
-            <td><span class="badge ${statusBadgeColor} clickable" onclick="toggleDebtStatus('${debt.docId}', '${debt.status}')">${debt.status}</span></td>
-            <td>
-                <button class="btn-icon delete" onclick="deleteItem('debts', '${debt.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
-    lucide.createIcons();
-}
-
-window.toggleDebtStatus = async function(docId, currentStatus) {
-    const newStatus = currentStatus === 'Chưa thanh toán' ? 'Đã thanh toán' : 'Chưa thanh toán';
-    await db.collection('debts').doc(docId).update({ status: newStatus });
-}
-
-window.handleDebtSubmit = function(e) {
-    e.preventDefault();
-    const newDebt = {
-        id: 'CN' + String(debts.length + 1).padStart(3, '0'),
-        date: getTodayDate(),
-        partner: document.getElementById('debt-partner').value,
-        type: document.getElementById('debt-type').value,
-        amount: parseInt(document.getElementById('debt-amount').value),
-        desc: document.getElementById('debt-desc').value,
-        status: 'Chưa thanh toán',
-        timestamp: Date.now()
-    };
-
-    db.collection('debts').add(newDebt);
-    closeModal('debt-modal');
-    e.target.reset();
-}
-
-
-// --- EXPENSES LOGIC ---
-function renderExpenses() {
-    const tbody = document.getElementById('expenses-tbody');
-    tbody.innerHTML = '';
-    
-    expenses.forEach(exp => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${exp.date}</td>
-            <td><span class="badge ${exp.type === 'Cố định' ? 'warning' : 'info'}">${exp.type}</span></td>
-            <td>${exp.desc}</td>
-            <td class="text-danger font-semibold">${formatCurrency(exp.amount)}</td>
-            <td>
-                <button class="btn-icon delete" onclick="deleteItem('expenses', '${exp.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
-    lucide.createIcons();
-}
-
-window.handleExpenseSubmit = function(e) {
-    e.preventDefault();
-    const newExpense = {
-        date: getTodayDate(),
-        type: document.getElementById('exp-type').value,
-        desc: document.getElementById('exp-desc').value,
-        amount: parseInt(document.getElementById('exp-amount').value),
-        timestamp: Date.now()
-    };
-
-    db.collection('expenses').add(newExpense);
-    closeModal('expense-modal');
-    e.target.reset();
+    if(lowStockAlerts.length > 0) alert('Thao tác thành công!\n⚠️ Lưu ý: Một số mặt hàng sắp hết kho!');
 }
 
 
@@ -634,12 +777,14 @@ window.openModal = function(id) {
 }
 window.closeModal = function(id) {
     document.getElementById(id).classList.remove('active');
+    resetFormUI(id);
 }
 
 document.querySelectorAll('.modal-overlay').forEach(modal => {
     modal.addEventListener('click', (e) => {
         if(e.target === modal) {
             modal.classList.remove('active');
+            resetFormUI(modal.id);
         }
     });
 });

@@ -133,7 +133,7 @@
                     </div>
                 </section>
 
-                <!-- Purchase Orders (Đặt hàng NCC) Section -->
+                <!-- Purchase Orders Section -->
                 <section id="purchase" class="page-section">
                     <div class="section-header">
                         <h2>Danh sách Đặt hàng NCC</h2>
@@ -263,7 +263,7 @@
                         <input type="text" id="inv-unit" required placeholder="1 LÍT">
                     </div>
                     <div class="form-group">
-                        <label>Số lượng đầu kỳ</label>
+                        <label>Số lượng tồn</label>
                         <input type="number" id="inv-qty" required min="0" value="0">
                     </div>
                 </div>
@@ -295,6 +295,10 @@
             </div>
             <form id="purchase-form" onsubmit="handlePurchaseSubmit(event)">
                 <div class="form-group-row">
+                    <div class="form-group" style="flex:1">
+                        <label>Mã Đơn Nhập</label>
+                        <input type="text" id="pur-id" placeholder="VD: NH001 (Bỏ trống tự tạo)">
+                    </div>
                     <div class="form-group" style="flex:2">
                         <label>Nhà cung cấp</label>
                         <input type="text" id="pur-supplier" required placeholder="SƠN AN KHÁNH">
@@ -326,7 +330,7 @@
                     </ul>
                     <div class="order-total" id="pur-total-amount" style="margin-top: 15px;">0 ₫</div>
                 </div>
-                <button type="submit" class="btn-primary w-full" style="margin-top: 15px;">Gửi đơn đặt hàng</button>
+                <button type="submit" class="btn-primary w-full" style="margin-top: 15px;">Lưu đơn đặt hàng</button>
             </form>
         </div>
     </div>
@@ -340,12 +344,16 @@
             </div>
             <form id="order-form" onsubmit="handleOrderSubmit(event)">
                 <div class="form-group-row">
+                    <div class="form-group" style="flex:1">
+                        <label>Mã Đơn</label>
+                        <input type="text" id="ord-id" placeholder="VD: DH001 (Bỏ trống tự tạo)">
+                    </div>
                     <div class="form-group" style="flex:2">
                         <label>Tên khách hàng</label>
                         <input type="text" id="ord-customer" required placeholder="Nguyễn Văn A">
                     </div>
                     <div class="form-group" style="flex:1">
-                        <label>Ngày giao hàng</label>
+                        <label>Ngày giao</label>
                         <input type="date" id="ord-date" required>
                     </div>
                 </div>
@@ -392,7 +400,13 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn-primary w-full" style="margin-top: 15px;">Hoàn tất đơn</button>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label>
+                        <input type="checkbox" id="ord-debt-check"> Khách ghi nợ (chưa thanh toán đủ)
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-primary w-full" style="margin-top: 15px;">Lưu đơn bán hàng</button>
             </form>
         </div>
     </div>
