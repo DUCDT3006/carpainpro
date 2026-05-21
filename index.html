@@ -27,6 +27,9 @@
                 <button class="nav-item" data-target="inventory">
                     <i data-lucide="package"></i> Quản lý Kho
                 </button>
+                <button class="nav-item" data-target="purchase">
+                    <i data-lucide="truck"></i> Đặt hàng NCC
+                </button>
                 <button class="nav-item" data-target="orders">
                     <i data-lucide="shopping-cart"></i> Đơn Bán Hàng
                 </button>
@@ -114,16 +117,43 @@
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>Ngày nhập</th>
                                     <th>Mã SP</th>
                                     <th>Đơn vị tính</th>
                                     <th>SL tồn</th>
                                     <th>Giá nhập</th>
                                     <th>Giá bán</th>
                                     <th>Nhà cung cấp</th>
+                                    <th>Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody id="inventory-tbody">
+                                <!-- JS injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Purchase Orders (Đặt hàng NCC) Section -->
+                <section id="purchase" class="page-section">
+                    <div class="section-header">
+                        <h2>Danh sách Đặt hàng NCC</h2>
+                        <button class="btn-primary" onclick="openModal('purchase-modal')">
+                            <i data-lucide="plus"></i> Tạo đơn nhập hàng
+                        </button>
+                    </div>
+                    <div class="table-container glass">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Mã đơn</th>
+                                    <th>Ngày đặt</th>
+                                    <th>Nhà cung cấp</th>
+                                    <th>Tổng tiền</th>
+                                    <th>Trạng thái (Click đổi)</th>
+                                    <th>Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="purchase-tbody">
                                 <!-- JS injected -->
                             </tbody>
                         </table>
@@ -145,9 +175,9 @@
                                     <th>Mã đơn</th>
                                     <th>Ngày giao</th>
                                     <th>Khách hàng</th>
-                                    <th>Phí Ship</th>
                                     <th>Tổng tiền</th>
-                                    <th>Trạng thái</th>
+                                    <th>Trạng thái (Click đổi)</th>
+                                    <th>Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody id="orders-tbody">
@@ -174,7 +204,8 @@
                                     <th>Khách hàng / NCC</th>
                                     <th>Loại</th>
                                     <th>Số tiền</th>
-                                    <th>Trạng thái</th>
+                                    <th>Trạng thái (Click đổi)</th>
+                                    <th>Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody id="debts-tbody">
@@ -200,6 +231,7 @@
                                     <th>Loại chi phí</th>
                                     <th>Mô tả</th>
                                     <th>Số tiền</th>
+                                    <th>Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody id="expenses-tbody">
@@ -217,7 +249,7 @@
     <div id="inventory-modal" class="modal-overlay">
         <div class="modal-content glass-modal">
             <div class="modal-header">
-                <h2>Nhập vật tư mới</h2>
+                <h2>Khai báo vật tư mới</h2>
                 <button class="close-btn" onclick="closeModal('inventory-modal')"><i data-lucide="x"></i></button>
             </div>
             <form id="inventory-form" onsubmit="handleInventorySubmit(event)">
@@ -231,17 +263,17 @@
                         <input type="text" id="inv-unit" required placeholder="1 LÍT">
                     </div>
                     <div class="form-group">
-                        <label>Số lượng</label>
-                        <input type="number" id="inv-qty" required min="1">
+                        <label>Số lượng đầu kỳ</label>
+                        <input type="number" id="inv-qty" required min="0" value="0">
                     </div>
                 </div>
                 <div class="form-group-row">
                     <div class="form-group">
-                        <label>Giá nhập</label>
+                        <label>Giá nhập mặc định</label>
                         <input type="number" id="inv-in-price" required>
                     </div>
                     <div class="form-group">
-                        <label>Giá bán</label>
+                        <label>Giá bán mặc định</label>
                         <input type="number" id="inv-out-price" required>
                     </div>
                 </div>
@@ -249,12 +281,57 @@
                     <label>Nhà cung cấp</label>
                     <input type="text" id="inv-supplier" required placeholder="SƠN AN KHÁNH">
                 </div>
-                <button type="submit" class="btn-primary w-full">Lưu vào kho</button>
+                <button type="submit" class="btn-primary w-full">Lưu vật tư</button>
             </form>
         </div>
     </div>
 
-    <!-- Order Modal -->
+    <!-- Purchase Order Modal (Đặt hàng NCC) -->
+    <div id="purchase-modal" class="modal-overlay">
+        <div class="modal-content glass-modal order-modal">
+            <div class="modal-header">
+                <h2>Tạo Đơn Đặt Hàng NCC</h2>
+                <button class="close-btn" onclick="closeModal('purchase-modal')"><i data-lucide="x"></i></button>
+            </div>
+            <form id="purchase-form" onsubmit="handlePurchaseSubmit(event)">
+                <div class="form-group-row">
+                    <div class="form-group" style="flex:2">
+                        <label>Nhà cung cấp</label>
+                        <input type="text" id="pur-supplier" required placeholder="SƠN AN KHÁNH">
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label>Ngày đặt hàng</label>
+                        <input type="date" id="pur-date" required>
+                    </div>
+                </div>
+                
+                <div class="order-items-section">
+                    <h4>Chọn sản phẩm cần đặt</h4>
+                    <div class="form-group-row add-item-row" style="align-items:flex-end;">
+                        <div class="form-group" style="flex:2">
+                            <select id="pur-product-select" onchange="fillPurchasePrice()">
+                                <!-- Populated by JS -->
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <input type="number" id="pur-item-price" placeholder="Giá nhập" min="0">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <input type="number" id="pur-qty" placeholder="SL" min="1" value="1">
+                        </div>
+                        <button type="button" class="btn-secondary" style="margin-bottom:1px;" onclick="addPurchaseItem()">Thêm</button>
+                    </div>
+                    <ul id="pur-items-list" class="order-items-list">
+                        <!-- Added items go here -->
+                    </ul>
+                    <div class="order-total" id="pur-total-amount" style="margin-top: 15px;">0 ₫</div>
+                </div>
+                <button type="submit" class="btn-primary w-full" style="margin-top: 15px;">Gửi đơn đặt hàng</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sales Order Modal -->
     <div id="order-modal" class="modal-overlay">
         <div class="modal-content glass-modal order-modal">
             <div class="modal-header">
@@ -272,15 +349,32 @@
                         <input type="date" id="ord-date" required>
                     </div>
                 </div>
+                <div class="form-group-row">
+                    <div class="form-group" style="flex:1">
+                        <label>Số điện thoại</label>
+                        <input type="text" id="ord-phone" placeholder="09xxxxxxx">
+                    </div>
+                    <div class="form-group" style="flex:2">
+                        <label>Địa chỉ giao hàng</label>
+                        <input type="text" id="ord-address" placeholder="123 Đường A...">
+                    </div>
+                </div>
                 
                 <div class="order-items-section">
                     <h4>Chọn sản phẩm</h4>
-                    <div class="form-group-row add-item-row">
-                        <select id="ord-product-select">
-                            <!-- Populated by JS -->
-                        </select>
-                        <input type="number" id="ord-qty" placeholder="SL" min="1" value="1" style="width: 80px;">
-                        <button type="button" class="btn-secondary" onclick="addOrderItem()">Thêm</button>
+                    <div class="form-group-row add-item-row" style="align-items:flex-end;">
+                        <div class="form-group" style="flex:2">
+                            <select id="ord-product-select" onchange="fillOrderPrice()">
+                                <!-- Populated by JS -->
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <input type="number" id="ord-item-price" placeholder="Giá bán" min="0">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <input type="number" id="ord-qty" placeholder="SL" min="1" value="1">
+                        </div>
+                        <button type="button" class="btn-secondary" style="margin-bottom:1px;" onclick="addOrderItem()">Thêm</button>
                     </div>
                     <ul id="ord-items-list" class="order-items-list">
                         <!-- Added items go here -->
@@ -296,13 +390,6 @@
                             <div class="order-total" id="ord-total-amount" style="margin-top: 5px;">0 ₫</div>
                         </div>
                     </div>
-                    
-                </div>
-
-                <div class="form-group" style="margin-top: 15px;">
-                    <label>
-                        <input type="checkbox" id="ord-debt-check"> Khách ghi nợ (chưa thanh toán đủ)
-                    </label>
                 </div>
 
                 <button type="submit" class="btn-primary w-full" style="margin-top: 15px;">Hoàn tất đơn</button>

@@ -18,11 +18,12 @@ const db = firebase.firestore();
 // --- STATE MANAGEMENT ---
 let inventory = [];
 let orders = [];
+let purchaseOrders = [];
 let expenses = [];
 let debts = [];
 
-// Order đang được tạo
 let currentOrderItems = [];
+let currentPurchaseItems = [];
 
 // --- FORMATTING UTILS ---
 const formatCurrency = (amount) => {
@@ -38,6 +39,7 @@ const getTodayDateISO = () => {
 };
 
 document.getElementById('ord-date').value = getTodayDateISO();
+document.getElementById('pur-date').value = getTodayDateISO();
 
 // --- NAVIGATION LOGIC ---
 const navItems = document.querySelectorAll('.nav-item');
@@ -60,11 +62,23 @@ navItems.forEach(item => {
     });
 });
 
+// --- GLOBAL DELETE FUNCTION ---
+window.deleteItem = async function(collection, docId) {
+    if(confirm('Bạn có chắc chắn muốn xóa bản ghi này?')) {
+        try {
+            await db.collection(collection).doc(docId).delete();
+        } catch (e) {
+            console.error("Lỗi khi xóa: ", e);
+            alert("Có lỗi xảy ra khi xóa!");
+        }
+    }
+}
 
 // --- DASHBOARD LOGIC ---
 function renderDashboard() {
     let totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
     
+    // Inventory cost based on current items
     let inventoryCost = inventory.reduce((sum, item) => sum + (item.qty * item.inPrice), 0);
     let totalExpense = expenses.reduce((sum, exp) => sum + exp.amount, 0);
     let totalCost = inventoryCost + totalExpense;
@@ -84,14 +98,14 @@ function renderDashboard() {
     document.getElementById('stat-orders').textContent = orders.length;
     document.getElementById('stat-debts').textContent = formatCurrency(totalDebt);
 
-    // Lịch sử giao dịch
     const recentList = document.getElementById('recent-transactions');
     recentList.innerHTML = '';
     
     const allTransactions = [
-        ...orders.map(o => ({ type: 'Thu', desc: `Đơn hàng ${o.id} - ${o.customer}`, amount: o.total, date: o.date, ts: o.timestamp })),
-        ...expenses.map(e => ({ type: 'Chi', desc: e.desc, amount: -e.amount, date: e.date, ts: e.timestamp }))
-    ].sort((a,b) => (b.ts || 0) - (a.ts || 0)); // Sort by timestamp descending
+        ...orders.map(o => ({ type: 'Thu', desc: `Bán: ${o.id} - ${o.customer}`, amount: o.total, date: o.date, ts: o.timestamp })),
+        ...expenses.map(e => ({ type: 'Chi', desc: `Chi phí: ${e.desc}`, amount: -e.amount, date: e.date, ts: e.timestamp })),
+        ...purchaseOrders.filter(p => p.status === 'Đã nhận hàng').map(p => ({ type: 'Chi', desc: `Nhập: ${p.id} - ${p.supplier}`, amount: -p.total, date: p.date, ts: p.timestamp }))
+    ].sort((a,b) => (b.ts || 0) - (a.ts || 0));
 
     allTransactions.slice(0, 5).forEach(t => {
         const li = document.createElement('li');
@@ -101,13 +115,12 @@ function renderDashboard() {
                 <span style="margin-left: 10px">${t.desc}</span>
             </div>
             <span class="${t.type === 'Thu' ? 'text-success' : 'text-danger'} font-semibold">
-                ${t.type === 'Thu' ? '+' : ''}${formatCurrency(t.amount)}
+                ${t.type === 'Thu' ? '+' : ''}${formatCurrency(Math.abs(t.amount))}
             </span>
         `;
         recentList.appendChild(li);
     });
 
-    // Cảnh báo hết hàng
     const lowStockList = document.getElementById('low-stock-list');
     lowStockList.innerHTML = '';
     const lowStockItems = inventory.filter(i => i.qty <= 3); 
@@ -129,36 +142,37 @@ function renderDashboard() {
 // --- FIREBASE LISTENERS ---
 db.collection("inventory").onSnapshot((snapshot) => {
     inventory = [];
-    snapshot.forEach(doc => {
-        inventory.push({ docId: doc.id, ...doc.data() });
-    });
+    snapshot.forEach(doc => inventory.push({ docId: doc.id, ...doc.data() }));
     renderInventory();
     renderDashboard();
+    updateOrderSelect();
+    updatePurchaseSelect();
 });
 
 db.collection("orders").onSnapshot((snapshot) => {
     orders = [];
-    snapshot.forEach(doc => {
-        orders.push({ docId: doc.id, ...doc.data() });
-    });
+    snapshot.forEach(doc => orders.push({ docId: doc.id, ...doc.data() }));
     renderOrders();
+    renderDashboard();
+});
+
+db.collection("purchaseOrders").onSnapshot((snapshot) => {
+    purchaseOrders = [];
+    snapshot.forEach(doc => purchaseOrders.push({ docId: doc.id, ...doc.data() }));
+    renderPurchaseOrders();
     renderDashboard();
 });
 
 db.collection("debts").onSnapshot((snapshot) => {
     debts = [];
-    snapshot.forEach(doc => {
-        debts.push({ docId: doc.id, ...doc.data() });
-    });
+    snapshot.forEach(doc => debts.push({ docId: doc.id, ...doc.data() }));
     renderDebts();
     renderDashboard();
 });
 
 db.collection("expenses").onSnapshot((snapshot) => {
     expenses = [];
-    snapshot.forEach(doc => {
-        expenses.push({ docId: doc.id, ...doc.data() });
-    });
+    snapshot.forEach(doc => expenses.push({ docId: doc.id, ...doc.data() }));
     renderExpenses();
     renderDashboard();
 });
@@ -174,26 +188,27 @@ function renderInventory() {
         if(item.qty <= 3) tr.className = 'row-warning';
         
         tr.innerHTML = `
-            <td>${item.date}</td>
             <td class="font-semibold text-primary">${item.code}</td>
             <td>${item.unit}</td>
             <td class="${item.qty <= 3 ? 'text-warning font-bold' : ''}">${item.qty}</td>
             <td>${formatCurrency(item.inPrice)}</td>
             <td>${formatCurrency(item.outPrice)}</td>
             <td>${item.supplier}</td>
+            <td>
+                <button class="btn-icon delete" onclick="deleteItem('inventory', '${item.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
-    updateOrderSelect();
+    lucide.createIcons();
 }
 
 window.handleInventorySubmit = function(e) {
     e.preventDefault();
     const newItem = {
-        date: getTodayDate(),
         code: document.getElementById('inv-code').value.toUpperCase(),
         unit: document.getElementById('inv-unit').value.toUpperCase(),
-        qty: parseInt(document.getElementById('inv-qty').value),
+        qty: parseInt(document.getElementById('inv-qty').value) || 0,
         inPrice: parseInt(document.getElementById('inv-in-price').value),
         outPrice: parseInt(document.getElementById('inv-out-price').value),
         supplier: document.getElementById('inv-supplier').value.toUpperCase(),
@@ -205,23 +220,206 @@ window.handleInventorySubmit = function(e) {
     e.target.reset();
 }
 
-// --- ORDER LOGIC ---
+// --- PURCHASE ORDERS (ĐẶT HÀNG NCC) LOGIC ---
+function renderPurchaseOrders() {
+    const tbody = document.getElementById('purchase-tbody');
+    tbody.innerHTML = '';
+    
+    purchaseOrders.forEach(order => {
+        const tr = document.createElement('tr');
+        let statusBadge = '';
+        if(order.status === 'Đang chờ') {
+            statusBadge = `<span class="badge warning clickable" onclick="togglePurchaseStatus('${order.docId}', '${order.status}', '${escape(JSON.stringify(order))}')">Đang chờ (Click để Nhận)</span>`;
+        } else {
+            statusBadge = `<span class="badge success">Đã nhận hàng</span>`;
+        }
+
+        tr.innerHTML = `
+            <td class="font-semibold">${order.id}</td>
+            <td>${order.date}</td>
+            <td>${order.supplier}</td>
+            <td class="text-danger font-semibold">${formatCurrency(order.total)}</td>
+            <td>${statusBadge}</td>
+            <td>
+                <button class="btn-icon delete" onclick="deleteItem('purchaseOrders', '${order.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    lucide.createIcons();
+}
+
+function updatePurchaseSelect() {
+    const select = document.getElementById('pur-product-select');
+    select.innerHTML = '<option value="">-- Chọn sản phẩm --</option>';
+    inventory.forEach(item => {
+        select.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit}</option>`;
+    });
+}
+
+window.fillPurchasePrice = function() {
+    const code = document.getElementById('pur-product-select').value;
+    const priceInput = document.getElementById('pur-item-price');
+    if(!code) { priceInput.value = ''; return; }
+    const product = inventory.find(i => i.code === code);
+    if(product) priceInput.value = product.inPrice;
+}
+
+window.addPurchaseItem = function() {
+    const select = document.getElementById('pur-product-select');
+    const priceInput = document.getElementById('pur-item-price');
+    const qtyInput = document.getElementById('pur-qty');
+    
+    const code = select.value;
+    const price = parseInt(priceInput.value);
+    const qty = parseInt(qtyInput.value);
+
+    if(!code || qty < 1 || isNaN(price)) return alert('Vui lòng chọn SP, giá và số lượng hợp lệ');
+
+    const product = inventory.find(i => i.code === code);
+    
+    const existingItem = currentPurchaseItems.find(i => i.code === code);
+    if(existingItem) {
+        existingItem.qty += qty;
+        existingItem.price = price; // Update to latest price
+    } else {
+        currentPurchaseItems.push({
+            code: product.code,
+            name: `${product.code} - ${product.unit}`,
+            price: price,
+            qty: qty
+        });
+    }
+
+    renderPurchaseItems();
+    qtyInput.value = 1;
+    select.value = "";
+    priceInput.value = "";
+}
+
+window.renderPurchaseItems = function() {
+    const list = document.getElementById('pur-items-list');
+    list.innerHTML = '';
+    let total = 0;
+
+    currentPurchaseItems.forEach((item, index) => {
+        total += item.price * item.qty;
+        const li = document.createElement('li');
+        li.className = 'order-item';
+        li.innerHTML = `
+            <div>${item.name} <span class="text-muted">x${item.qty} (${formatCurrency(item.price)})</span></div>
+            <div>
+                ${formatCurrency(item.price * item.qty)}
+                <i data-lucide="trash-2" style="cursor:pointer; color:var(--danger); width:16px; margin-left:10px" onclick="removePurchaseItem(${index})"></i>
+            </div>
+        `;
+        list.appendChild(li);
+    });
+    lucide.createIcons();
+    document.getElementById('pur-total-amount').textContent = formatCurrency(total);
+}
+
+window.removePurchaseItem = function(index) {
+    currentPurchaseItems.splice(index, 1);
+    renderPurchaseItems();
+}
+
+window.handlePurchaseSubmit = async function(e) {
+    e.preventDefault();
+    if(currentPurchaseItems.length === 0) return alert('Vui lòng thêm ít nhất 1 sản phẩm');
+
+    const supplier = document.getElementById('pur-supplier').value;
+    const date = document.getElementById('pur-date').value;
+    const totalAmount = currentPurchaseItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    
+    const newId = 'NH' + String(purchaseOrders.length + 1).padStart(3, '0');
+    
+    const newOrder = {
+        id: newId,
+        date: date,
+        supplier: supplier,
+        total: totalAmount,
+        status: 'Đang chờ', // Chưa cộng kho
+        items: currentPurchaseItems,
+        timestamp: Date.now()
+    };
+
+    await db.collection('purchaseOrders').add(newOrder);
+    
+    currentPurchaseItems = [];
+    e.target.reset();
+    document.getElementById('pur-date').value = getTodayDateISO();
+    renderPurchaseItems();
+    closeModal('purchase-modal');
+}
+
+window.togglePurchaseStatus = async function(docId, currentStatus, orderJsonStr) {
+    if(currentStatus === 'Đang chờ') {
+        if(confirm('Xác nhận đã nhận hàng? (Hệ thống sẽ tự động cộng số lượng vào Kho và Ghi nhận Công nợ)')) {
+            const orderData = JSON.parse(unescape(orderJsonStr));
+            
+            // 1. Cập nhật trạng thái
+            await db.collection('purchaseOrders').doc(docId).update({ status: 'Đã nhận hàng' });
+            
+            // 2. Cộng tồn kho
+            orderData.items.forEach(async (orderItem) => {
+                let invItem = inventory.find(i => i.code === orderItem.code);
+                if(invItem) {
+                    await db.collection('inventory').doc(invItem.docId).update({
+                        qty: invItem.qty + orderItem.qty
+                    });
+                }
+            });
+
+            // 3. Tạo công nợ NCC
+            await db.collection('debts').add({
+                id: 'CN' + String(debts.length + 1).padStart(3, '0'),
+                date: getTodayDate(),
+                partner: orderData.supplier,
+                type: 'Nợ NCC',
+                amount: orderData.total,
+                desc: `Nhập hàng đơn ${orderData.id}`,
+                status: 'Chưa thanh toán',
+                timestamp: Date.now()
+            });
+
+            alert('Đã nhận hàng và cập nhật hệ thống thành công!');
+        }
+    }
+}
+
+
+// --- SALES ORDER LOGIC ---
 function renderOrders() {
     const tbody = document.getElementById('orders-tbody');
     tbody.innerHTML = '';
     
     orders.forEach(order => {
         const tr = document.createElement('tr');
+        
+        let statusBadge = `<span class="badge ${order.status === 'Hoàn thành' ? 'success' : 'warning'} clickable" onclick="toggleOrderStatus('${order.docId}', '${order.status}')">${order.status}</span>`;
+
         tr.innerHTML = `
             <td class="font-semibold">${order.id}</td>
             <td>${order.deliveryDate}</td>
-            <td>${order.customer}</td>
-            <td>${formatCurrency(order.shipping)}</td>
+            <td>
+                <div>${order.customer}</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted)">${order.phone || ''}</div>
+            </td>
             <td class="text-success font-semibold">${formatCurrency(order.total)}</td>
-            <td><span class="badge success">${order.status}</span></td>
+            <td>${statusBadge}</td>
+            <td>
+                <button class="btn-icon delete" onclick="deleteItem('orders', '${order.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
+    lucide.createIcons();
+}
+
+window.toggleOrderStatus = async function(docId, currentStatus) {
+    const newStatus = currentStatus === 'Hoàn thành' ? 'Đang xử lý' : 'Hoàn thành';
+    await db.collection('orders').doc(docId).update({ status: newStatus });
 }
 
 function updateOrderSelect() {
@@ -229,19 +427,29 @@ function updateOrderSelect() {
     select.innerHTML = '<option value="">-- Chọn sản phẩm --</option>';
     inventory.forEach(item => {
         if(item.qty > 0) {
-            select.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit} (${formatCurrency(item.outPrice)}) - Tồn: ${item.qty}</option>`;
+            select.innerHTML += `<option value="${item.code}">${item.code} - ${item.unit} (Tồn: ${item.qty})</option>`;
         }
     });
 }
 
+window.fillOrderPrice = function() {
+    const code = document.getElementById('ord-product-select').value;
+    const priceInput = document.getElementById('ord-item-price');
+    if(!code) { priceInput.value = ''; return; }
+    const product = inventory.find(i => i.code === code);
+    if(product) priceInput.value = product.outPrice;
+}
+
 window.addOrderItem = function() {
     const select = document.getElementById('ord-product-select');
+    const priceInput = document.getElementById('ord-item-price');
     const qtyInput = document.getElementById('ord-qty');
     
     const code = select.value;
+    const price = parseInt(priceInput.value);
     const qty = parseInt(qtyInput.value);
 
-    if(!code || qty < 1) return alert('Vui lòng chọn SP và số lượng hợp lệ');
+    if(!code || qty < 1 || isNaN(price)) return alert('Vui lòng chọn SP, Giá và số lượng hợp lệ');
 
     const product = inventory.find(i => i.code === code);
     if(qty > product.qty) return alert(`Không đủ tồn kho. Tồn hiện tại: ${product.qty}`);
@@ -250,11 +458,12 @@ window.addOrderItem = function() {
     if(existingItem) {
         if(existingItem.qty + qty > product.qty) return alert('Tổng số lượng vượt tồn kho');
         existingItem.qty += qty;
+        existingItem.price = price; // Update to latest selected price
     } else {
         currentOrderItems.push({
             code: product.code,
             name: `${product.code} - ${product.unit}`,
-            price: product.outPrice,
+            price: price,
             qty: qty
         });
     }
@@ -262,43 +471,18 @@ window.addOrderItem = function() {
     renderOrderItems();
     qtyInput.value = 1;
     select.value = "";
+    priceInput.value = "";
 }
 
-window.renderOrderItems = function() {
-    const list = document.getElementById('ord-items-list');
-    list.innerHTML = '';
-    let productTotal = 0;
-
-    currentOrderItems.forEach((item, index) => {
-        productTotal += item.price * item.qty;
-        const li = document.createElement('li');
-        li.className = 'order-item';
-        li.innerHTML = `
-            <div>${item.name} <span class="text-muted">x${item.qty}</span></div>
-            <div>
-                ${formatCurrency(item.price * item.qty)}
-                <i data-lucide="trash-2" style="cursor:pointer; color:var(--danger); width:16px; margin-left:10px" onclick="removeOrderItem(${index})"></i>
-            </div>
-        `;
-        list.appendChild(li);
-    });
-    lucide.createIcons();
-    
-    const shippingCost = parseInt(document.getElementById('ord-shipping').value) || 0;
-    const totalAmount = productTotal + shippingCost;
-    document.getElementById('ord-total-amount').textContent = formatCurrency(totalAmount);
-}
-
-window.removeOrderItem = function(index) {
-    currentOrderItems.splice(index, 1);
-    renderOrderItems();
-}
-
+// Reuse order items rendering from before
+// We just mapped renderOrderItems globally above
 window.handleOrderSubmit = async function(e) {
     e.preventDefault();
     if(currentOrderItems.length === 0) return alert('Vui lòng thêm ít nhất 1 sản phẩm');
 
     const customer = document.getElementById('ord-customer').value;
+    const phone = document.getElementById('ord-phone').value;
+    const address = document.getElementById('ord-address').value;
     const deliveryDate = document.getElementById('ord-date').value;
     const shipping = parseInt(document.getElementById('ord-shipping').value) || 0;
     const isDebt = document.getElementById('ord-debt-check').checked;
@@ -316,7 +500,6 @@ window.handleOrderSubmit = async function(e) {
         }
     });
 
-    // Generate pseudo-ID
     const newOrderId = 'DH' + String(orders.length + 1).padStart(3, '0');
     
     const newOrder = {
@@ -324,6 +507,8 @@ window.handleOrderSubmit = async function(e) {
         date: getTodayDate(),
         deliveryDate: deliveryDate,
         customer: customer,
+        phone: phone,
+        address: address,
         shipping: shipping,
         total: totalAmount,
         status: isDebt ? 'Chưa thanh toán' : 'Hoàn thành',
@@ -351,15 +536,10 @@ window.handleOrderSubmit = async function(e) {
     renderOrderItems();
     closeModal('order-modal');
     
-    // Cảnh báo hết hàng
-    const lowStockAlerts = inventory.filter(i => i.qty <= 3 && i.qty > 0);
-    const outOfStockAlerts = inventory.filter(i => i.qty === 0);
-    
-    let alertMsg = 'Lên đơn hàng thành công!\n';
-    if(outOfStockAlerts.length > 0) alertMsg += `\n⚠️ CẢNH BÁO: Đã hết hàng: ${outOfStockAlerts.map(i=>i.code).join(', ')}`;
-    if(lowStockAlerts.length > 0) alertMsg += `\n⚠️ Sắp hết hàng: ${lowStockAlerts.map(i=>i.code).join(', ')}`;
-    if(outOfStockAlerts.length > 0 || lowStockAlerts.length > 0) alert(alertMsg);
+    const lowStockAlerts = inventory.filter(i => (i.qty - currentOrderItems.filter(ci=>ci.code===i.code).reduce((s,c)=>s+c.qty,0)) <= 3);
+    if(lowStockAlerts.length > 0) alert('Lên đơn hàng thành công!\n⚠️ Lưu ý: Một số mặt hàng sắp hết kho, vui lòng kiểm tra!');
 }
+
 
 // --- DEBTS LOGIC ---
 function renderDebts() {
@@ -368,17 +548,28 @@ function renderDebts() {
     
     debts.forEach(debt => {
         const tr = document.createElement('tr');
-        const badgeColor = debt.type === 'Khách nợ' ? 'info' : 'warning';
+        const typeBadgeColor = debt.type === 'Khách nợ' ? 'info' : 'warning';
+        const statusBadgeColor = debt.status === 'Chưa thanh toán' ? 'danger' : 'success';
+        
         tr.innerHTML = `
             <td class="font-semibold">${debt.id}</td>
             <td>${debt.date}</td>
             <td>${debt.partner}</td>
-            <td><span class="badge ${badgeColor}">${debt.type}</span></td>
+            <td><span class="badge ${typeBadgeColor}">${debt.type}</span></td>
             <td class="text-danger font-semibold">${formatCurrency(debt.amount)}</td>
-            <td><span class="badge ${debt.status === 'Chưa thanh toán' ? 'danger' : 'success'}">${debt.status}</span></td>
+            <td><span class="badge ${statusBadgeColor} clickable" onclick="toggleDebtStatus('${debt.docId}', '${debt.status}')">${debt.status}</span></td>
+            <td>
+                <button class="btn-icon delete" onclick="deleteItem('debts', '${debt.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
+    lucide.createIcons();
+}
+
+window.toggleDebtStatus = async function(docId, currentStatus) {
+    const newStatus = currentStatus === 'Chưa thanh toán' ? 'Đã thanh toán' : 'Chưa thanh toán';
+    await db.collection('debts').doc(docId).update({ status: newStatus });
 }
 
 window.handleDebtSubmit = function(e) {
@@ -409,12 +600,16 @@ function renderExpenses() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${exp.date}</td>
-            <td><span class="badge ${exp.type === 'Cố định' ? 'warning' : 'danger'}">${exp.type}</span></td>
+            <td><span class="badge ${exp.type === 'Cố định' ? 'warning' : 'info'}">${exp.type}</span></td>
             <td>${exp.desc}</td>
             <td class="text-danger font-semibold">${formatCurrency(exp.amount)}</td>
+            <td>
+                <button class="btn-icon delete" onclick="deleteItem('expenses', '${exp.docId}')"><i data-lucide="trash-2" style="width:18px"></i></button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
+    lucide.createIcons();
 }
 
 window.handleExpenseSubmit = function(e) {
@@ -441,7 +636,6 @@ window.closeModal = function(id) {
     document.getElementById(id).classList.remove('active');
 }
 
-// Close modal on outside click
 document.querySelectorAll('.modal-overlay').forEach(modal => {
     modal.addEventListener('click', (e) => {
         if(e.target === modal) {
